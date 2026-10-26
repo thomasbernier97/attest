@@ -14,6 +14,16 @@ Entry format:
 - Next: …
 ```
 
+## 2026-10-26 · first real clip through the Files API, SAM and Muse Spark · 5a583f9
+
+- Works on the deployed URL: nothing; no app is deployed.
+- Stubbed behind a contract: nothing. `worker/meta/files.ts` uploads with a 7-day expiry; `worker/perception/sam.ts` sends one sam-3.1 request per object label in parallel and parses the stream into `Tracks`; `worker/perception/spark.ts` asks muse-spark-1.3 for an `Observation` under a JSON Schema built per procedure and validates the reply. All three use fetch and Web APIs only (`worker/tsconfig.json` has the webworker lib and no Node types). `worker/meta/api.ts` counts requests and refuses any past the budget it is given. `scripts/first-clip.ts` runs them on one clip (usage in its header comment).
+- Decisions (Thomas, Oct 26): `fps` is a positive number in Session, Tracks and Recording; a tracked object's `confidence` is null when no frame has a box; MeasurementTable rates are null with nothing to measure. Meta's docs pages not reachable through Context7 (quota spent) were read on dev.meta.ai directly. The clip was recorded as a 5 s take with the first second dropped.
+- Findings: the numbers, the SAM and Spark request shapes and the proposals (4 s, 12.5 fps, Spark effort minimal) are in the first-clip entry under the measurements open question in `docs/spec.md`. SAM's `c` is one value per track, repeated on every frame; SAM only returns it with `metadata.include_confidence: "true"`. SAM requests time out, and a stream that does not end in a completed response fails; one failed label fails the whole segment's tracks rather than returning partial tracks. Spark cached no tokens on an identical second call without `prompt_cache_key`.
+- Open questions for Thomas: Tracks has no instance id, so several matches in one frame (SAM allows up to 16) become several boxes with the same `t_ms`, and `confidence` is a mean over matches rather than over frames; no frame on this clip had more than one match.
+- Evidence: typecheck, lint and the existing tests exit 0. A fresh-context review found no key path, no Node API in `worker/` and no un-updated consumer; its stream, timeout, frame-count and saved-error findings are fixed. 9 Meta requests. Both runs' Tracks and Observation parse under the shared schemas. No tests added, by Thomas's call.
+- Next: a more specific bracket prompt (it was found only in the last 15 frames), `prompt_cache_key` for Spark, latency on browser-made segments, and masks to R2 (`mask_key` is null for now).
+
 ## 2026-10-26 · shared contracts package · 29db5ae
 
 - Works on the deployed URL: nothing; no app is deployed.

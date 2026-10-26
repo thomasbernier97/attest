@@ -15,8 +15,8 @@ export const TrackedObject = z.object({
   label: ObjectLabel,
   prompt: z.string(),
   model_call_id: Uuid,
-  // Mean over frames with a box.
-  confidence: Confidence,
+  // Mean over frames with a box; null when no frame has one.
+  confidence: Confidence.nullable(),
   // Frames with a box divided by frames.
   present_ratio: z.number().min(0).max(1),
   // Empty when SAM returns no matches; that is a valid result, not a gap.
@@ -29,7 +29,8 @@ export const Tracks = z.object({
   session_id: Uuid,
   segment_n: SegmentN,
   file_id: z.string(),
-  fps: z.int().positive(),
+  // Positive, not an integer: capture runs at 12.5 fps.
+  fps: z.number().positive(),
   frame_w: z.int().positive(),
   frame_h: z.int().positive(),
   objects: z.array(TrackedObject),

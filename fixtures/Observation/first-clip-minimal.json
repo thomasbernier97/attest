@@ -1,0 +1,32 @@
+{
+  "segment_summary": "Hand holds screwdriver above white bench with fan and bracket lying in view. No fastening occurs during segment.",
+  "worker_activity": "working",
+  "step_observations": [
+    {
+      "step_id": "890fdff7-c650-440c-aec8-0a85a5cac322",
+      "state": "completed",
+      "confidence": 1,
+      "evidence": {
+        "object_labels": [
+          "fan",
+          "bracket"
+        ],
+        "moment_ms": 1000,
+        "description": "Fan and bracket lie stationary on bench in view"
+      }
+    },
+    {
+      "step_id": "15fc0526-ba92-4362-8b39-905334a55cd0",
+      "state": "completed",
+      "confidence": 1,
+      "evidence": {
+        "object_labels": [
+          "screwdriver"
+        ],
+        "moment_ms": 1000,
+        "description": "Screwdriver held in worker's hand above bench"
+      }
+    }
+  ],
+  "hazards": []
+}

@@ -5,7 +5,8 @@ import { EpochMs, ModelId, Uuid } from "./common";
 
 export const MEASUREMENT_TABLE_VERSION = 1;
 
-const Rate = z.number().min(0).max(1);
+// Null when there was nothing to measure (0 of 0).
+const Rate = z.number().min(0).max(1).nullable();
 
 export const RunMeasurement = z.object({
   recording_id: Uuid,

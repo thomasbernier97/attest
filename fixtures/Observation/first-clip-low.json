@@ -1,0 +1,45 @@
+{
+  "segment_summary": "Hand holds screwdriver above bench while fan and bracket lie separate in view; no fastening occurs.",
+  "worker_activity": "working",
+  "step_observations": [
+    {
+      "step_id": "890fdff7-c650-440c-aec8-0a85a5cac322",
+      "state": "completed",
+      "confidence": 1,
+      "evidence": {
+        "object_labels": [
+          "fan",
+          "bracket"
+        ],
+        "moment_ms": 1000,
+        "description": "Fan and bracket rest separately on white bench in view."
+      }
+    },
+    {
+      "step_id": "15fc0526-ba92-4362-8b39-905334a55cd0",
+      "state": "completed",
+      "confidence": 1,
+      "evidence": {
+        "object_labels": [
+          "screwdriver"
+        ],
+        "moment_ms": 500,
+        "description": "Worker's hand grips red-handled screwdriver above bench."
+      }
+    },
+    {
+      "step_id": "98418985-1d3b-484d-a734-b9395c7a1fb6",
+      "state": "not_observed",
+      "confidence": 0.95,
+      "evidence": {
+        "object_labels": [
+          "fan",
+          "bracket"
+        ],
+        "moment_ms": 2000,
+        "description": "Bracket and fan remain separate; no screwing occurs."
+      }
+    }
+  ],
+  "hazards": []
+}

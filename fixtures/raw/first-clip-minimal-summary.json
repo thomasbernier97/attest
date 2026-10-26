@@ -1,0 +1,99 @@
+{
+  "run": "minimal",
+  "file_id": "file-2465570580880548",
+  "clip": {
+    "width": 1280,
+    "height": 720,
+    "fps": 12.5,
+    "frames": 50,
+    "duration_ms": 4000
+  },
+  "spark_effort": "minimal",
+  "upload_ms": 3748,
+  "sam_and_spark_wall_ms": 4542,
+  "requests_sent": 5,
+  "sam": [
+    {
+      "label": "fan",
+      "response_id": "resp_6adfe3b184e6ae9752fc4afc",
+      "latency_ms": 4538,
+      "usage": {
+        "input_tokens": 0,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 0,
+        "video_frames_processed": 50
+      },
+      "frames_billed": 50,
+      "cost_micro_usd": 10000,
+      "matches": 50,
+      "frames_with_box": 50,
+      "max_instances_per_frame": 1
+    },
+    {
+      "label": "bracket",
+      "response_id": "resp_6adfe3b0bc03825dd64c4ec9",
+      "latency_ms": 3778,
+      "usage": {
+        "input_tokens": 0,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 0,
+        "video_frames_processed": 50
+      },
+      "frames_billed": 50,
+      "cost_micro_usd": 10000,
+      "matches": 15,
+      "frames_with_box": 15,
+      "max_instances_per_frame": 1
+    },
+    {
+      "label": "screwdriver",
+      "response_id": "resp_6adfe3b0ff8de69f87974e84",
+      "latency_ms": 3918,
+      "usage": {
+        "input_tokens": 0,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 0,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 0,
+        "video_frames_processed": 50
+      },
+      "frames_billed": 50,
+      "cost_micro_usd": 10000,
+      "matches": 50,
+      "frames_with_box": 50,
+      "max_instances_per_frame": 1
+    }
+  ],
+  "spark": {
+    "response_id": "resp_6adfe3b341ea3a6cd72e460e",
+    "latency_ms": 3782,
+    "usage": {
+      "input_tokens": 1336,
+      "input_tokens_details": {
+        "cached_tokens": 0
+      },
+      "output_tokens": 377,
+      "output_tokens_details": {
+        "reasoning_tokens": 204
+      },
+      "total_tokens": 1713
+    },
+    "cost_micro_usd": 3273
+  }
+}
