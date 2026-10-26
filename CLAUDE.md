@@ -23,7 +23,7 @@ When two sources disagree, the higher one wins; report the conflict, don't resol
 
 ## Hard rules (from docs/spec.md)
 
-- Standard-mode model IDs only: `muse-spark-1.3`, `sam-3.1`, `muse-voice-transcribe-1.0`, `muse-image-1.0`, and `muse-wonder-1.0` once ATT-122 confirms it. Startup fails on anything else.
+- Standard-mode model IDs only: `muse-spark-1.3`, `sam-3.1`, `muse-voice-transcribe-1.0`, `muse-image-1.0`, and `muse-wonder-1.0` once Meta's docs confirm it. Startup fails on anything else.
 - No mocked providers on the production path. A step completes only with evidence from the current session.
 - Fixtures are test inputs only; nothing on the deployed path reads `fixtures/`.
 - A period the system could not observe is a `GapEvent`. No event is ever fabricated, and nothing is inferred across a gap.
@@ -38,4 +38,4 @@ When two sources disagree, the higher one wins; report the conflict, don't resol
 - All work is Thomas's; there are no separate seats. Branches are short-lived and named `thomas/att-<n>-<slug>` with the Linear id.
 - `docs/ownership.md` lists the paths a branch may touch and maps them to workstream areas A to E; a path it doesn't list fails.
 - CI (typecheck, lint, unit tests, gitleaks) gates every merge.
-- Commit messages and PR bodies name the Linear id and carry no AI attribution (no Co-Authored-By trailer).
+- Everything in the repo uses plain words: code, docs, notes, commit messages, PR titles and bodies never name Linear ids or planning labels (the branch name is the only exception), and carry no AI attribution (no Co-Authored-By trailer).
