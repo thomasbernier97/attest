@@ -68,7 +68,7 @@ export const TracksMessage = z.object({
     z.object({
       label: ObjectLabel,
       color: HexColor,
-      confidence: Confidence,
+      confidence: Confidence.nullable(),
       boxes: z.array(TrackBox),
     }),
   ),

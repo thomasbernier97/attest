@@ -2,6 +2,8 @@
 
 > **Note.** Transcribed Oct 26, 2026 from the Notion page "Contracts v1 — field-level specification (pre-kickoff)" as written Oct 24, 2026 (last edited 2026-10-24 02:28 UTC); the Notion page is no longer edited. Amended Oct 26, 2026 by Thomas, matching the spec's 2026-10-26 change log: `ObjectDraft` objects have no cap, the Model IDs row adds `muse-wonder-1.0` once ATT-122 confirms it, and items 6 and 7 of "Changes to the spec" follow his decisions. All other text is unchanged.
 
+> **Amended Oct 26, 2026 after the first real clip.** `fps` is a positive number (capture runs at 12.5), a tracked object's `confidence` is null when no frame has a box, and `MeasurementTable` rates are null when there was nothing to measure.
+
 > 📏 Field-level specification of every contract in the spec's section 7, plus the conventions all seats share. Written Oct 24, 2026 as prose so the Day 1 Zod commit (ATT-15) is transcription. At kickoff this page becomes `docs/contracts.md` (ATT-12) and stops being edited here. Where this page tightens or changes the spec table, the change is listed at the end and goes through the spec's change log.
 
 ## Conventions every seat follows
@@ -96,7 +98,7 @@ Session {
   started_at: epoch_ms | null (first segment accepted)
   ended_at: epoch_ms | null
   segment_ms: int (4000 unless the Day 1 gate changes it)
-  fps: int (set from ATT-129)
+  fps: number (positive; capture runs at 12.5)
   time_cap_ms: int (600000)
   spend_cap_micro_usd: int
   client: { user_agent: string, encoder: "webcodecs_h264" }
@@ -133,7 +135,7 @@ session_state { session: Session, procedure_id: uuid, steps: StepState[], hazard
   StepState   { step_id: uuid, state: "pending" | "active" | "completed" | "unobserved" | "blocked", updated_ms: int, event_id: uuid | null }
   HazardState { rule_id: uuid, state: "armed" | "satisfied" | "violated" | "cleared", updated_ms: int, event_id: uuid | null }
 segment_ack   { n: int, state: "queued" | "processing" | "done" | "gap" }
-tracks        { n: int, frame_w: int, frame_h: int, objects: [{ label, color, confidence, boxes: [{ t_ms: int, x1, y1, x2, y2: int (px) }] }] }   // boxes only; masks stay server-side unless ATT-131 decides otherwise
+tracks        { n: int, frame_w: int, frame_h: int, objects: [{ label, color, confidence: number | null, boxes: [{ t_ms: int, x1, y1, x2, y2: int (px) }] }] }   // boxes only; masks stay server-side unless the mask payload measurement decides otherwise
 step_event    StepEvent
 hazard_event  HazardEvent
 gap           GapEvent
@@ -155,13 +157,13 @@ Tracks {
   session_id: uuid
   segment_n: int
   file_id: string (Meta)
-  fps: int
+  fps: number (positive; capture runs at 12.5)
   frame_w: int, frame_h: int
   objects: [{
     label: object_label
     prompt: string (as sent)
     model_call_id: uuid
-    confidence: number (mean over frames with a box)
+    confidence: number | null (mean over frames with a box; null when no frame has one)
     present_ratio: number (frames with a box / frames)
     frames: [{ t_ms: int, box: [x1, y1, x2, y2] (int px), mask_key: string | null }]
   }]
@@ -280,7 +282,7 @@ Recording {
   source_session_id: uuid (the live session that was recorded)
   procedure_id: uuid, procedure_hash: string
   r2_prefix: string (sessions/<source_session_id>/)
-  segment_count: int, segment_ms: int, fps: int
+  segment_count: int, segment_ms: int, fps: number (positive)
   recorded_at: epoch_ms
   scenario: "clean" | "skip" | "hazard" | "skip_and_hazard"
   notes: string
@@ -309,14 +311,16 @@ MeasurementTable {
   detection_window_ms: int (a detection counts if |detected session_ms − labeled ms| ≤ this; proposed 15000)
   runs: uuid[] (recording ids, 12)
   per_run: [{ recording_id, step_recall, step_precision, skip_catch_rate, hazard_catch_rate, false_alarms, latencies_ms: int[] }]
-  step_recall: number        // labeled completions matched by a step_completed within the window / labeled completions
-  step_precision: number     // step_completed events matched by a label / step_completed events
-  skip_catch_rate: number    // labeled skips with a step_unobserved before the next labeled completion / labeled skips
-  hazard_catch_rate: number  // labeled violations with a hazard_violated before cleared_at_ms / labeled violations
+  step_recall: number | null        // labeled completions matched by a step_completed within the window / labeled completions
+  step_precision: number | null     // step_completed events matched by a label / step_completed events
+  skip_catch_rate: number | null    // labeled skips with a step_unobserved before the next labeled completion / labeled skips
+  hazard_catch_rate: number | null  // labeled violations with a hazard_violated before cleared_at_ms / labeled violations
   false_alarms_per_run: number // step_unobserved or hazard_violated events with no label within the window, per run
   latency_p50_ms: int, latency_p90_ms: int // over matched events: detected session_ms − labeled ms
 }
 ```
+
+A rate is null when there was nothing to measure (0 of 0), never 0 or 1.
 
 The table is computed only by `scripts/measure` over the replay path; the in-app view renders this object and nothing else.
 

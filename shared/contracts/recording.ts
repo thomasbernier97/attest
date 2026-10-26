@@ -17,7 +17,8 @@ export const Recording = z.object({
   r2_prefix: z.string(),
   segment_count: z.int().nonnegative(),
   segment_ms: z.int().positive(),
-  fps: z.int().positive(),
+  // Positive, not an integer: capture runs at 12.5 fps.
+  fps: z.number().positive(),
   recorded_at: EpochMs,
   scenario: Scenario,
   notes: z.string(),

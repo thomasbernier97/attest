@@ -19,7 +19,8 @@ export const Session = z.object({
   started_at: EpochMs.nullable(),
   ended_at: EpochMs.nullable(),
   segment_ms: z.int().positive(),
-  fps: z.int().positive(),
+  // Positive, not an integer: capture runs at 12.5 fps.
+  fps: z.number().positive(),
   time_cap_ms: z.int().positive(),
   spend_cap_micro_usd: MicroUsd,
   client: z.object({

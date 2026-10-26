@@ -1,4 +1,9 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["src"]
+  "compilerOptions": {
+    // Worker code uses fetch and Web APIs only, so Node's types stay out.
+    "lib": ["es2024", "webworker"],
+    "types": []
+  },
+  "include": ["meta", "perception"]
 }
