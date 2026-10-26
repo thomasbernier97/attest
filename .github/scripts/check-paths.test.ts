@@ -162,4 +162,12 @@ describe("check-paths command", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(otherOwnerBranch);
   });
+
+  it("exits 1 when the branch adds the row for its own new path", () => {
+    const withRow = ownership.replace("| `tests/` |", "| `notes/` | E | Notes |\n| `tests/` |");
+    expect(parseOwnershipTable(withRow)).toContain("notes/");
+    const result = run(validBranch, { "docs/ownership.md": withRow, "notes/todo.md": "y\n" });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("notes/todo.md");
+  });
 });

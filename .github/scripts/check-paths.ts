@@ -1,4 +1,4 @@
-// Fails a pull request whose branch is misnamed or that changes a path docs/ownership.md does not list.
+// Fails a pull request whose branch is misnamed or that changes a path docs/ownership.md on the base branch does not list.
 // Usage: BASE_SHA=<sha> HEAD_SHA=<sha> BRANCH_NAME=<name> node .github/scripts/check-paths.ts
 import { runGit } from "./git.ts";
 
@@ -98,7 +98,8 @@ function main(): number {
   const paths = runGit(["diff", "--name-only", "--no-renames", "-z", `${base}...${head}`], cwd)
     .split("\0")
     .filter((path) => path !== "");
-  const ownershipMarkdown = runGit(["show", `${head}:${OWNERSHIP_FILE}`], cwd);
+  // The map comes from the base branch, so a pull request cannot list the paths it adds.
+  const ownershipMarkdown = runGit(["show", `${base}:${OWNERSHIP_FILE}`], cwd);
 
   const problems = checkPaths({ branch, paths, ownershipMarkdown });
   for (const problem of problems) console.error(problem);
