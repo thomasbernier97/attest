@@ -14,6 +14,14 @@ Entry format:
 - Next: …
 ```
 
+## 2026-10-26 · repository scaffold and CI checks · thomas · thomas/att-13-scaffold @ 4ee247b (base; this entry ships in the branch's one commit)
+
+- Works on the deployed URL: nothing; no app is deployed.
+- Stubbed behind a contract: nothing. `worker/`, `web/` and `shared/` are empty workspace packages (package.json and tsconfig.json only); each adds a `"typecheck": "tsc --noEmit"` script when it gets source, and the root `pnpm typecheck` runs it.
+- Needs from: Thomas: mark the CI jobs Typecheck, Lint, Unit tests, Changed paths, Wording and Secret scan as required checks on `main` (a GitHub setting, not changed here).
+- Evidence: pnpm 10.34.9 through corepack on Node 24; TypeScript 6.0.3 because typescript-eslint does not support 7.x yet. The path and wording checks in `.github/scripts/` have 38 unit tests, written first and shown failing, and each check caught one mutation. gitleaks 8.30.1 (pinned by version and SHA-256) fails on a throwaway clone with one seeded fake key and passes on this branch. actionlint 1.7.12 reports no errors.
+- Next: Thomas reviews and merges the PR. Later work adds packages' source and tests on this workspace; check scripts run directly with `node` (type stripping), no build step.
+
 ## 2026-10-26 · ATT-12b · thomas · thomas/att-12-kickoff-docs @ 8b13f22 (base; this entry ships in the branch's one commit)
 
 - Works on the deployed URL: nothing yet; this unit commits documents only, and no app is deployed.
