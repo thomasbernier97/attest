@@ -1,0 +1,19 @@
+{
+  "name": "demo",
+  "source": "docs/demo-procedure.md",
+  "response_id": "resp_6adfea6a21976c5d8edd4c2c",
+  "latency_ms": 42113,
+  "usage": {
+    "input_tokens": 1004,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 11385,
+    "output_tokens_details": {
+      "reasoning_tokens": 10493
+    },
+    "total_tokens": 12389
+  },
+  "cost_micro_usd": 49642,
+  "requests_sent": 1
+}

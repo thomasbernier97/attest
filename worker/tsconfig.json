@@ -5,5 +5,5 @@
     "lib": ["es2024", "webworker"],
     "types": []
   },
-  "include": ["meta", "perception"]
+  "include": ["meta", "perception", "procedure"]
 }

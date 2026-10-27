@@ -14,6 +14,16 @@ Entry format:
 - Next: …
 ```
 
+## 2026-10-26 · procedure reader: demo procedure text to a ProcedureDraft with Muse Spark · fc46bc4
+
+- Works on the deployed URL: nothing; no app is deployed.
+- Stubbed behind a contract: nothing. `worker/procedure/compile.ts` sends the procedure text to muse-spark-1.3 (reasoning effort high, json_schema from the shared `ProcedureDraft`) and validates the reply with `ProcedureDraft.safeParse`, whose refinements carry the contract's cross-checks; a reply that fails is rejected with its body, never repaired. It reuses `outputText` and `SparkReplyError` from `worker/perception/spark.ts` (now exported). `scripts/compile-procedure.ts` runs it once (usage in its header comment). The approved demo procedure is `docs/demo-procedure.md`; the spec's demo script and storyboard follow it.
+- Decisions in the compile prompt (for Thomas to confirm): a hazard `condition` is the safe state, satisfied when it holds and violated when it does not, checkable in any segment, because the observe prompt never shows Spark `before_step`; the state machine applies the rule before its step. Objects are only what a cue or a condition needs the camera to find; screws and the fan cable are judged on what they attach to. Worn, held, switched or lit is `object_state`.
+- Findings: one request; 8 steps, 8 objects, 2 hazard rules, every check passed on the first draft. Spark also set step 4 to depend on 2 and 3, step 6 on 5, step 7 on 6, step 8 on 3. Prompts: "gloves", "case fan", "tape square", "screwdriver", "tool tray", "metal bracket", "USB fan controller", "power strip". 42.1 s, 1,004 tokens in, 11,385 out (10,493 reasoning), $0.0496.
+- Open questions for Thomas: whether step 6 should depend on step 5 (the cable can be connected with the fan lying down); 8 tracked objects cost more SAM frames per segment than the 6 the cost model assumed; the demo kit list in `docs/spec.md` does not yet name the power strip, tool tray or tape.
+- Evidence: typecheck and lint exit 0; a fresh-context review found no bug or key path, and its hazard-condition, object-scope and worn-state findings went into the prompt before the run. The draft parses under the shared schema. No tests added, by Thomas's call.
+- Next: the approval flow that mints ids and stores a `Procedure`; a SAM run on the new prompts, "metal bracket" first.
+
 ## 2026-10-26 · first real clip through the Files API, SAM and Muse Spark · 5a583f9
 
 - Works on the deployed URL: nothing; no app is deployed.
