@@ -1,0 +1,166 @@
+{
+  "v": 1,
+  "title": "Replace the cooling fan: mount the case fan on its bracket and connect it to the fan controller",
+  "language": "en",
+  "steps": [
+    {
+      "ordinal": 1,
+      "instruction": "Put on the gloves.",
+      "expected_objects": [
+        "work_gloves"
+      ],
+      "completion_cue": "both hands are in the work gloves",
+      "cue_kind": "worker_action",
+      "depends_on": []
+    },
+    {
+      "ordinal": 2,
+      "instruction": "Place the case fan flat inside the taped square.",
+      "expected_objects": [
+        "case_fan",
+        "taped_square"
+      ],
+      "completion_cue": "the fan lies flat inside the square",
+      "cue_kind": "object_placed",
+      "depends_on": []
+    },
+    {
+      "ordinal": 3,
+      "instruction": "Take the screwdriver out of the tool tray.",
+      "expected_objects": [
+        "screwdriver",
+        "tool_tray"
+      ],
+      "completion_cue": "the screwdriver is out of the tray",
+      "cue_kind": "object_placed",
+      "depends_on": []
+    },
+    {
+      "ordinal": 4,
+      "instruction": "Install the bracket. Set the mounting bracket on the fan so its holes line up with two opposite corner holes, and fasten it with the two screws.",
+      "expected_objects": [
+        "mounting_bracket",
+        "case_fan"
+      ],
+      "completion_cue": "the bracket sits on the fan with both screws in",
+      "cue_kind": "object_state",
+      "depends_on": [
+        2,
+        3
+      ]
+    },
+    {
+      "ordinal": 5,
+      "instruction": "Stand the fan upright on its bracket, next to the fan controller.",
+      "expected_objects": [
+        "case_fan",
+        "mounting_bracket",
+        "fan_controller"
+      ],
+      "completion_cue": "the fan stands on its bracket beside the controller",
+      "cue_kind": "object_placed",
+      "depends_on": [
+        4
+      ]
+    },
+    {
+      "ordinal": 6,
+      "instruction": "Connect the fan cable to the fan controller.",
+      "expected_objects": [
+        "case_fan",
+        "fan_controller"
+      ],
+      "completion_cue": "the fan cable is plugged into the controller",
+      "cue_kind": "object_state",
+      "depends_on": [
+        5
+      ]
+    },
+    {
+      "ordinal": 7,
+      "instruction": "Switch the power strip on and check the fan.",
+      "expected_objects": [
+        "case_fan",
+        "power_strip"
+      ],
+      "completion_cue": "the fan blades are spinning",
+      "cue_kind": "object_state",
+      "depends_on": [
+        6
+      ]
+    },
+    {
+      "ordinal": 8,
+      "instruction": "Return the screwdriver to the tool tray.",
+      "expected_objects": [
+        "screwdriver",
+        "tool_tray"
+      ],
+      "completion_cue": "the screwdriver is back in the tray",
+      "cue_kind": "object_placed",
+      "depends_on": [
+        3
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "label": "work_gloves",
+      "display_name": "Work gloves",
+      "prompt": "gloves"
+    },
+    {
+      "label": "case_fan",
+      "display_name": "Case fan",
+      "prompt": "case fan"
+    },
+    {
+      "label": "taped_square",
+      "display_name": "Taped square",
+      "prompt": "tape square"
+    },
+    {
+      "label": "screwdriver",
+      "display_name": "Screwdriver",
+      "prompt": "screwdriver"
+    },
+    {
+      "label": "tool_tray",
+      "display_name": "Tool tray",
+      "prompt": "tool tray"
+    },
+    {
+      "label": "mounting_bracket",
+      "display_name": "Mounting bracket",
+      "prompt": "metal bracket"
+    },
+    {
+      "label": "fan_controller",
+      "display_name": "Fan controller",
+      "prompt": "USB fan controller"
+    },
+    {
+      "label": "power_strip",
+      "display_name": "Power strip",
+      "prompt": "power strip"
+    }
+  ],
+  "hazard_rules": [
+    {
+      "condition": "both hands are in the work gloves",
+      "condition_kind": "object_state",
+      "object_label": "work_gloves",
+      "before_step": 2,
+      "severity": "block",
+      "message": "Put on work gloves before touching fan, bracket or screwdriver."
+    },
+    {
+      "condition": "power strip switch is off and its light is out",
+      "condition_kind": "object_state",
+      "object_label": "power_strip",
+      "before_step": 6,
+      "severity": "block",
+      "message": "Switch power strip off before connecting fan cable."
+    }
+  ]
+}

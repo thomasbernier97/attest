@@ -81,14 +81,14 @@ export class SparkReplyError extends Error {
   }
 }
 
-interface ResponseBody {
+export interface ResponseBody {
   id?: string;
   status?: string;
   usage?: Record<string, unknown>;
   output?: { type?: string; content?: { type?: string; text?: string }[] }[];
 }
 
-function outputText(body: ResponseBody): string {
+export function outputText(body: ResponseBody): string {
   for (const item of body.output ?? []) {
     if (item.type !== "message") continue;
     for (const part of item.content ?? []) {

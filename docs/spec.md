@@ -276,12 +276,12 @@ The video carries the case on its own; the live URL, public repo and README exis
 
 **Demo script** (one continuous live take, about 2 minutes, filmed with the deployed app)
 
-1. Procedure already approved on screen; camera on the bench; the worker says "start" and the session begins. SAM outlines appear on the fan, bracket, screwdriver, controller.
-2. Steps 1 to 3 complete at natural pace; each lights up with its clip thumbnail. Gloves hazard rule shown satisfied at step 3.
+1. Procedure already approved on screen; camera on the bench; the worker says "start" and the session begins. SAM outlines appear on the gloves, fan, bracket, screwdriver, controller, power strip, tool tray and taped square. The procedure is `docs/demo-procedure.md`.
+2. Steps 1 to 3 complete at natural pace (gloves on, fan flat in the taped square, screwdriver out of the tray); each lights up with its clip thumbnail. Gloves hazard rule shown satisfied at step 2.
 3. Worker asks "what's next?" mid-motion; spoken answer within a couple of seconds.
-4. Worker skips step 4 and starts step 5. Timeline marker turns red; system says "Step 4 not observed, did you install the bracket?" Worker says "go back", installs the bracket, marker clears.
-5. Worker reaches to connect the fan cable with the controller still plugged in. Hazard banner; step 6 blocked; worker unplugs; banner clears; step completes.
-6. Steps 7 and 8 complete; session closes; report appears: 8 steps, 1 skipped then completed, 1 hazard averted, p50 latency, session cost.
+4. Worker skips step 4 and starts step 5: the bracket stays on the mat while the fan stands up without it. Timeline marker turns red; system says "Step 4 not observed, did you install the bracket?" Worker says "go back", installs the bracket, marker clears.
+5. Worker reaches to connect the fan cable while the power strip's switch is still lit. Hazard banner; step 6 blocked; worker switches the power strip off and its light goes out; banner clears; step completes.
+6. Step 7 (power strip back on, fan blades spinning) and step 8 (screwdriver back in the tool tray) complete; session closes; report appears: 8 steps, 1 skipped then completed, 1 hazard averted, p50 latency, session cost.
 
 **Video storyboard** (target 2:50, hard limit 3:00, public; the primary judging artifact and the only one in the final round)
 
@@ -292,7 +292,7 @@ The video carries the case on its own; the live URL, public repo and README exis
 | 0:30 | Live take, part 1 | Demo script steps 1 to 3; SAM outlines live |
 | 0:50 | Voice | "What's next?" and the answer (Muse Voice Transcribe) |
 | 1:00 | The catch | Skip, flag, "go back", clear, with the evidence clip opened |
-| 1:25 | Hazard | Blocked step, unplug, clear; one line framing the rule as machine guarding, with the fan standing in for a machine (check the current OSHA most-cited list before citing it) |
+| 1:25 | Hazard | Blocked step, the power strip switched off (its light goes out), clear; one line framing the rule as machine guarding, with the fan standing in for a machine (check the current OSHA most-cited list before citing it) |
 | 1:40 | Report | Timeline, evidence, latency and cost |
 | 1:55 | Proof | Measurement table from 12 labeled runs; architecture diagram; the validator and state-machine code that decided the step; the public repo's first commit, after 12:00 ET Oct 26; Sentry, caps, load run; the chaos switch pulling a model mid-session with no fabricated event |
 | 2:30 | Reach | Second-domain procedure (Tier 3) or the SOP photo ingestion, 10 seconds; which one is decided at CP2, and the second procedure comes forward only if Tier 1 holds |
@@ -353,6 +353,7 @@ The video carries the case on its own; the live URL, public repo and README exis
 
 | Date | Change | Reason |
 | --- | --- | --- |
+| 2026-10-26 | Demo procedure approved and committed as `docs/demo-procedure.md`; demo script and storyboard follow it: the gloves rule is met at step 2 (was 3), the power hazard uses the power strip's lit switch instead of unplugging the controller, step 8 returns the screwdriver to the tool tray | Thomas approved the procedure text on Oct 26; the switch light is visible from overhead and off to connect, on to test reads as lockout |
 | 2026-10-26 | First real clip through the Files API, SAM 3.1 and Muse Spark; numbers under Day 1 measurements. Contracts amended: `fps` is a positive number in Session, Tracks and Recording; a tracked object's `confidence` is null when no frame has a box; MeasurementTable rates are null when there was nothing to measure. Proposed: 4 s segments, 12.5 fps, Spark effort minimal. | The capture rate of 12.5 fps does not fit an integer; 0 of 0 and no boxes had no valid value; measured cost and latency |
 | 2026-10-26 | Oct 23 research corrections applied (ATT-118). SAM: one concept per request, one request per object in parallel, no object cap, 50-frame billing minimum. Capture: 12.5 fps provisional until ATT-129, faststart, no audio track. SAM and Spark run in parallel; Spark reads the previous segment's tracks summary. Spark: text.format structured output, prompt\_cache\_key, effort from the Day 1 probe. Voice protocol details; spoken replies via speechSynthesis (decided Oct 23, ATT-17). Session DO stays awake (hibernation question resolved). Workers Paid limits and compatibility date. Files API expiry and file\_id deletion. Tier 2 gains the Muse Wonder compiler (ATT-122) and the Muse Spark Open spike (ATT-123); muse-wonder-1.0 joins the allowlist once confirmed. Voice authoring marked cut in the tables (ATT-96). Domain: tryattest.dev. Contracts v1 changes adopted (segment timing on the PUT, resume and acks, GapEvent, boxes-only tracks, Session, ProcedureDraft, EventBase), except: one AGENT\_NOTES.md instead of notes/\<seat>.md, and no cap on Procedure.objects. Not applied: the reported rubric weights (superseded by the Oct 26 rewrite) and the PWA and analytics cuts (kept). | Thomas's decisions on Oct 26; the spec is committed as docs/spec.md at kickoff (ATT-12) |
 | 2026-10-26 | Operating model: the five seats no longer run simultaneously; work runs as single-unit agent sessions on Thomas's GO; seat letters stay as workstream areas; "How to write a Flo agent prompt" added under the capacity model | Thomas's decision at kickoff |
