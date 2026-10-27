@@ -4,6 +4,8 @@
 
 > **Amended Oct 26, 2026 after the first real clip.** `fps` is a positive number (capture runs at 12.5), a tracked object's `confidence` is null when no frame has a box, and `MeasurementTable` rates are null when there was nothing to measure.
 
+> **Amended Oct 26, 2026 for the session server loop (Thomas).** `Procedure.compile_call_id` is null for a draft compiled outside the server, such as the demo draft a replay session is created from.
+
 > 📏 Field-level specification of every contract in the spec's section 7, plus the conventions all seats share. Written Oct 24, 2026 as prose so the Day 1 Zod commit (ATT-15) is transcription. At kickoff this page becomes `docs/contracts.md` (ATT-12) and stops being edited here. Where this page tightens or changes the spec table, the change is listed at the end and goes through the spec's change log.
 
 ## Conventions every seat follows
@@ -76,7 +78,7 @@ Procedure {
   steps: ProcedureStep[]      // draft fields plus: id: uuid, depends_on: uuid[], reference_image_key: string | null (R2 key)
   objects: ProcedureObject[]  // draft fields plus: id: uuid, color: string (hex, assigned by C for the overlay)
   hazard_rules: HazardRule[]  // draft fields plus: id: uuid, before_step: uuid
-  compile_call_id: uuid (ModelCall)
+  compile_call_id: uuid | null (ModelCall; null for a draft compiled outside the server)
 }
 ```
 

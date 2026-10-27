@@ -131,7 +131,8 @@ export const Procedure = z
     steps: z.array(ProcedureStep).min(1).max(30),
     objects: z.array(ProcedureObject).min(1),
     hazard_rules: z.array(HazardRule).max(8),
-    compile_call_id: Uuid,
+    // The compile ModelCall; null for a draft compiled outside the server.
+    compile_call_id: Uuid.nullable(),
   })
   .superRefine((procedure, ctx) => {
     checkRefs(procedure, ctx);

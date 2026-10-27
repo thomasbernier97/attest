@@ -190,8 +190,12 @@ function toTrackedObject(call: SamCall, input: SegmentInput): TrackedObject {
 export async function trackSegment(client: MetaClient, input: SegmentInput): Promise<{ tracks: Tracks; calls: SamCall[] }> {
   const started = Date.now();
   const calls = await Promise.all(input.objects.map((object) => trackObject(client, input.file_id, object.label, object.prompt, input.timeout_ms)));
-  const latency_ms = Date.now() - started;
-  const tracks = Tracks.parse({
+  return { tracks: buildTracks(calls, input, Date.now() - started), calls };
+}
+
+// One segment's Tracks from a completed SAM call per object.
+export function buildTracks(calls: readonly SamCall[], input: SegmentInput, latency_ms: number): Tracks {
+  return Tracks.parse({
     v: TRACKS_VERSION,
     session_id: input.session_id,
     segment_n: input.segment_n,
@@ -202,5 +206,4 @@ export async function trackSegment(client: MetaClient, input: SegmentInput): Pro
     objects: calls.map((call) => toTrackedObject(call, input)),
     latency_ms,
   });
-  return { tracks, calls };
 }

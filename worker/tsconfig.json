@@ -1,9 +1,8 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    // Worker code uses fetch and Web APIs only, so Node's types stay out.
-    "lib": ["es2024", "webworker"],
-    "types": []
+    // Worker code uses fetch, Web APIs and the Workers runtime only, so Node's types stay out.
+    "types": ["@cloudflare/workers-types"]
   },
-  "include": ["meta", "perception", "procedure"]
+  "include": ["index.ts", "env.ts", "meta", "perception", "procedure", "session"]
 }
