@@ -50,7 +50,7 @@ interface Failure {
   reason: GapEvent["reason"];
 }
 
-function classify(error: unknown): Failure {
+export function classify(error: unknown): Failure {
   if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
     return { outcome: "timeout", error_code: "timeout", reason: "model_timeout" };
   }

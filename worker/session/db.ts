@@ -31,6 +31,25 @@ export async function insertProcedure(db: D1Database, procedure: Procedure, draf
   return Procedure.parse(JSON.parse(row.body));
 }
 
+export async function procedureBySourceHash(db: D1Database, sourceHash: string): Promise<Procedure | null> {
+  const row = await db.prepare("SELECT body FROM procedures WHERE idempotency_key = ?").bind(`procedure:${sourceHash}`).first<{ body: string }>();
+  return row === null ? null : Procedure.parse(JSON.parse(row.body));
+}
+
+export async function getProcedure(db: D1Database, id: string): Promise<Procedure | null> {
+  const row = await db.prepare("SELECT body FROM procedures WHERE id = ?").bind(id).first<{ body: string }>();
+  return row === null ? null : Procedure.parse(JSON.parse(row.body));
+}
+
+// Sets approved_at once; an approved procedure is never changed again. Null when there is no such procedure.
+export async function approveProcedure(db: D1Database, id: string, now: number): Promise<Procedure | null> {
+  await db
+    .prepare("UPDATE procedures SET body = json_set(body, '$.approved_at', ?) WHERE id = ? AND json_extract(body, '$.approved_at') IS NULL")
+    .bind(now, id)
+    .run();
+  return getProcedure(db, id);
+}
+
 export async function insertSession(db: D1Database, session: Session, createdAt: number): Promise<void> {
   await db
     .prepare("INSERT INTO sessions (id, procedure_id, state, body, created_at) VALUES (?, ?, ?, ?, ?)")

@@ -1,10 +1,11 @@
-// Replays one recorded clip through the session server loop on a local wrangler dev: creates a
-// replay session from an approved ProcedureDraft, opens the session socket, uploads the clip as
+// Replays one recorded clip through the session server loop on a local wrangler dev: compiles the
+// procedure text (or gets the procedure already stored from it), approves it, creates a replay
+// session for it, opens the session socket, uploads the clip as
 // segment 0, prints every server message, then checks the messages against the local D1 rows and
 // prints the Meta request count and cost from the ModelCall rows.
 // Usage: pnpm tsx scripts/replay-clip.ts [--base http://127.0.0.1:8787]
-//          [--clip fixtures/clips/first-clip.mp4] [--draft fixtures/ProcedureDraft/demo.json]
-//          [--source docs/demo-procedure.md] [--wait-ms 60000]
+//          [--clip fixtures/clips/first-clip.mp4] [--source docs/demo-procedure.md] [--wait-ms 60000]
+// A text the server has not compiled before costs one more Meta request, of about 40 s.
 // wrangler dev must be running in worker/ with META_API_KEY and SESSION_SIGNING_KEY in .dev.vars.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -19,7 +20,6 @@ const { values } = parseArgs({
   options: {
     base: { type: "string", default: "http://127.0.0.1:8787" },
     clip: { type: "string", default: "fixtures/clips/first-clip.mp4" },
-    draft: { type: "string", default: "fixtures/ProcedureDraft/demo.json" },
     source: { type: "string", default: "docs/demo-procedure.md" },
     "wait-ms": { type: "string", default: "60000" },
   },
@@ -42,12 +42,21 @@ function probeDurationMs(path: string): number {
 const usd = (microUsd: number) => `$${(microUsd / 1_000_000).toFixed(6)}`;
 
 async function main(): Promise<void> {
-  const draft: unknown = JSON.parse(readFileSync(join(ROOT, values.draft), "utf8"));
   const sourceText = readFileSync(join(ROOT, values.source), "utf8");
+  const post = async (path: string, body: unknown) => {
+    const response = await fetch(`${values.base}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const json = (await response.json()) as Record<string, unknown>;
+    if (!response.ok) throw new Error(`POST ${path} returned ${String(response.status)}: ${JSON.stringify(json)}`);
+    console.log(`POST ${path} -> ${String(response.status)}`);
+    return json;
+  };
+  const compiled = (await post("/api/procedures", { v: 1, source_text: sourceText })) as { procedure: { id: string } };
+  const procedureId = compiled.procedure.id;
+  await post(`/api/procedures/${procedureId}/approve`, {});
   const created = await fetch(`${values.base}/api/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ v: 1, kind: "replay", draft, source_text: sourceText, user_agent: "scripts/replay-clip.ts" }),
+    body: JSON.stringify({ v: 1, kind: "replay", procedure_id: procedureId, user_agent: "scripts/replay-clip.ts" }),
   });
   const createdBody = (await created.json()) as { session: { id: string }; token: string };
   if (!created.ok) throw new Error(`POST /api/sessions returned ${String(created.status)}: ${JSON.stringify(createdBody)}`);

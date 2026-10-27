@@ -1,12 +1,26 @@
-// The Attest Worker: session API routes on Hono, and the Session Durable Object.
+// The Attest Worker: procedure and session API routes on Hono, and the Session Durable Object.
+// Everything outside /api/ is the web app, served from the static assets.
 import { ErrorResponse, ModelId, SegmentN, Sha256Hex, type ErrorCode } from "@attest/shared";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { Env } from "./env";
+import { MetaApiError } from "./meta/api";
+import { callCost } from "./meta/cost";
+import { DAILY_SPEND_CAP_MICRO_USD } from "./perception/config";
 import { SAM_MODEL } from "./perception/sam";
-import { SPARK_MODEL } from "./perception/spark";
-import { CreateSessionRequest, mintProcedure, newSession, sha256Hex } from "./session/create";
-import { ConflictError, insertProcedure, insertSession } from "./session/db";
+import { SPARK_MODEL, SparkReplyError, type ResponseBody } from "./perception/spark";
+import { COMPILE_TIMEOUT_MS, COMPILE_WORST_CASE_TOKENS, compileCallRow, compileProcedure } from "./procedure/compile";
+import { CompileProcedureRequest, CreateSessionRequest, mintProcedure, newSession, sha256Hex } from "./session/create";
+import {
+  ConflictError,
+  approveProcedure,
+  getProcedure,
+  insertModelCall,
+  insertProcedure,
+  insertSession,
+  procedureBySourceHash,
+  spendSoFar,
+} from "./session/db";
 import { errorBody, ERROR_STATUS } from "./session/errors";
 import { signToken, verifyToken } from "./session/token";
 
@@ -41,18 +55,70 @@ async function authorized(env: Env, token: string | undefined, sessionId: string
   return token !== undefined && (await verifyToken(env.SESSION_SIGNING_KEY, token, sessionId, Date.now()));
 }
 
+// Compiles procedure text into a Procedure awaiting approval. The same text returns the procedure
+// already stored from it, without a model call.
+app.post("/api/procedures", async (c) => {
+  const parsed = CompileProcedureRequest.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return fail(c, "invalid_request", z.prettifyError(parsed.error));
+  const text = parsed.data.source_text;
+  const sourceHash = await sha256Hex(text);
+  const existing = await procedureBySourceHash(c.env.DB, sourceHash);
+  if (existing !== null) return c.json({ v: 1, procedure: existing }, 200);
+
+  const worst = callCost({ model: SPARK_MODEL, tokens_cached: 0, media_units: 0, media_unit_kind: "none", ...COMPILE_WORST_CASE_TOKENS });
+  if ((await spendSoFar(c.env.DB, "", Date.now())).daily + worst > DAILY_SPEND_CAP_MICRO_USD) {
+    return fail(c, "spend_cap", "the daily spend cap would be passed");
+  }
+  const startedAt = Date.now();
+  let call;
+  try {
+    call = await compileProcedure({ apiKey: c.env.META_API_KEY, requestsLeft: 1 }, { text, timeout_ms: COMPILE_TIMEOUT_MS });
+  } catch (error) {
+    // Spark answered but the answer was rejected: the call still has an id and usage.
+    const raw = error instanceof SparkReplyError ? (error.raw as ResponseBody) : null;
+    const row = compileCallRow(
+      { model_call_id: crypto.randomUUID(), response_id: raw?.id ?? null, started_at: startedAt, latency_ms: Date.now() - startedAt, usage: raw?.usage ?? null },
+      error,
+    );
+    await insertModelCall(c.env.DB, row);
+    console.error("procedure compile failed", row.error_code, error instanceof Error ? error.message.slice(0, 500) : error);
+    if (row.outcome === "timeout") return fail(c, "model_timeout", "the procedure reader took too long", true);
+    if (row.outcome === "rate_limited") return fail(c, "rate_limited", "the procedure reader is rate limited", true);
+    if (error instanceof SparkReplyError) return fail(c, "model_error", "the procedure reader returned a draft that does not validate");
+    return fail(c, "model_error", "the procedure reader failed", !(error instanceof MetaApiError && error.status < 500));
+  }
+  await insertModelCall(c.env.DB, compileCallRow(call));
+  try {
+    const procedure = await insertProcedure(c.env.DB, mintProcedure(call.draft, sourceHash, call.started_at, call.model_call_id), call.draft);
+    return c.json({ v: 1, procedure }, 201);
+  } catch (error) {
+    // Another request compiled the same text first, to a different draft; the first one stays.
+    if (error instanceof ConflictError) return c.json({ v: 1, procedure: await procedureBySourceHash(c.env.DB, sourceHash) }, 200);
+    throw error;
+  }
+});
+
+app.get("/api/procedures/:id", async (c) => {
+  const procedure = await getProcedure(c.env.DB, c.req.param("id"));
+  if (procedure === null) return fail(c, "not_found", "no such procedure");
+  return c.json({ v: 1, procedure });
+});
+
+// Approves a procedure. Approving it again returns it unchanged.
+app.post("/api/procedures/:id/approve", async (c) => {
+  const procedure = await approveProcedure(c.env.DB, c.req.param("id"), Date.now());
+  if (procedure === null) return fail(c, "not_found", "no such procedure");
+  return c.json({ v: 1, procedure });
+});
+
 app.post("/api/sessions", async (c) => {
   const parsed = CreateSessionRequest.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return fail(c, "invalid_request", z.prettifyError(parsed.error));
   const request = parsed.data;
+  const procedure = await getProcedure(c.env.DB, request.procedure_id);
+  if (procedure === null) return fail(c, "not_found", "no such procedure");
+  if (procedure.approved_at === null) return fail(c, "invalid_request", "the procedure is not approved");
   const now = Date.now();
-  let procedure;
-  try {
-    procedure = await insertProcedure(c.env.DB, mintProcedure(request.draft, await sha256Hex(request.source_text), now), request.draft);
-  } catch (error) {
-    if (error instanceof ConflictError) return fail(c, "conflict", "this source text is already stored with a different draft");
-    throw error;
-  }
   const session = newSession(procedure, request, now);
   await insertSession(c.env.DB, session, now);
   await sessionStub(c.env, session.id).init(session, procedure);

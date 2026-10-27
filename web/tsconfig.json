@@ -1,4 +1,10 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["src"]
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    // Browser code only, so Node's types stay out.
+    "types": ["vite/client"]
+  },
+  "include": ["src", "vite.config.ts"]
 }

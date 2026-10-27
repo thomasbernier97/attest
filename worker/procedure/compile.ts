@@ -1,10 +1,19 @@
 // Procedure compiler: written procedure text to a ProcedureDraft with muse-spark-1.3 at reasoning
 // effort high, answered as structured output under the shared ProcedureDraft schema, then validated.
 // A reply that does not validate is rejected with its body; it is never repaired.
-import { ProcedureDraft } from "@attest/shared";
+import { MODEL_CALL_VERSION, ProcedureDraft, type ModelCall } from "@attest/shared";
 import { z } from "zod";
 import { metaFetch, type MetaClient } from "../meta/api";
+import { callCost, usageNumber } from "../meta/cost";
+import { classify } from "../perception/segment";
 import { outputText, SPARK_MODEL, SparkReplyError, type ResponseBody } from "../perception/spark";
+
+// A compile call that takes longer is abandoned; the reader at effort high took 42 s on the demo procedure.
+export const COMPILE_TIMEOUT_MS = 300_000;
+// Longest procedure text the compiler accepts, which bounds its input tokens.
+export const MAX_SOURCE_CHARS = 20_000;
+// Worst-case usage of one compile call, for the spend check before it is sent.
+export const COMPILE_WORST_CASE_TOKENS = { tokens_in: 10_000, tokens_out: 32_000 };
 
 export interface CompileInput {
   text: string;
@@ -95,5 +104,39 @@ export async function compileProcedure(client: MetaClient, input: CompileInput):
     usage: parsed.usage ?? null,
     draft: result.data,
     raw,
+  };
+}
+
+// The ModelCall row for a compile call. A call that failed has its usage when Spark answered and
+// the answer was rejected, and none otherwise.
+export function compileCallRow(
+  call: { model_call_id: string; response_id: string | null; started_at: number; latency_ms: number; usage: Record<string, unknown> | null },
+  failure: unknown = null,
+): ModelCall {
+  const usage = {
+    model: SPARK_MODEL,
+    tokens_in: usageNumber(call.usage, "input_tokens") ?? 0,
+    tokens_cached: usageNumber(call.usage, "input_tokens_details", "cached_tokens") ?? 0,
+    tokens_out: usageNumber(call.usage, "output_tokens") ?? 0,
+    media_units: 0,
+    media_unit_kind: "none",
+  } as const;
+  const failed = failure === null ? null : classify(failure);
+  return {
+    v: MODEL_CALL_VERSION,
+    id: call.model_call_id,
+    session_id: null,
+    purpose: "compile",
+    request_id: call.response_id,
+    segment_n: null,
+    concept_label: null,
+    started_at: call.started_at,
+    latency_ms: call.latency_ms,
+    ...usage,
+    outcome: failed?.outcome ?? "ok",
+    error_code: failed?.error_code ?? null,
+    cost_micro_usd: callCost(usage),
+    // Without Meta's request id, the attempt part of the key is the call's own id.
+    idempotency_key: call.response_id === null ? `call:null:compile:null:-:${call.model_call_id}` : `call:${call.response_id}`,
   };
 }
