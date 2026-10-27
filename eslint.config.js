@@ -6,7 +6,7 @@ export default defineConfig(
   { ignores: ["**/node_modules/", "**/dist/", "**/.wrangler/"] },
   js.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       parserOptions: {
