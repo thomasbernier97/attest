@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "attest",
+  "main": "index.ts",
+  "compatibility_date": "2026-10-15",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "SESSIONS", "class_name": "SessionDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
+  "d1_databases": [{ "binding": "DB", "database_name": "attest", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "attest-media" }]
+  // Secrets (META_API_KEY, SESSION_SIGNING_KEY) are wrangler secrets; locally they come from .dev.vars.
+}

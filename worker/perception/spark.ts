@@ -19,6 +19,10 @@ export interface ObserveInput {
   state: string;
   // The previous segment's tracks summary; null for the first segment.
   previous_tracks: string | null;
+  // Summaries of the segments before this one, oldest first.
+  recent_summaries: readonly string[];
+  // One key per procedure, so segments share the cached prompt prefix; null sends none.
+  prompt_cache_key: string | null;
   effort: ReasoningEffort;
   timeout_ms: number;
 }
@@ -63,10 +67,12 @@ export function observePrompt(input: ObserveInput): string {
     ...objects,
     "Hazard rules:",
     ...(rules.length === 0 ? ["none"] : rules),
-    `State so far: ${input.state}`,
-    `Previous segment's tracks: ${input.previous_tracks ?? "none; this is the first segment"}`,
     "Report only what this segment shows. Give a step observation only for a step this segment shows evidence about; use cannot_tell instead of guessing.",
     "moment_ms is milliseconds from the start of this segment. segment_summary is at most 60 words; each evidence description is at most 25 words.",
+    // Everything above is the same for every segment of a procedure, so it is the cached prefix.
+    `State so far: ${input.state}`,
+    `Earlier segments: ${input.recent_summaries.length === 0 ? "none" : input.recent_summaries.join(" | ")}`,
+    `Previous segment's tracks: ${input.previous_tracks ?? "none"}`,
   ].join("\n");
 }
 
@@ -103,6 +109,7 @@ export async function observeSegment(client: MetaClient, input: ObserveInput): P
   const body = {
     model: SPARK_MODEL,
     reasoning: { effort: input.effort },
+    ...(input.prompt_cache_key === null ? {} : { prompt_cache_key: input.prompt_cache_key }),
     prompt_cache_retention: "24h",
     input: [
       {

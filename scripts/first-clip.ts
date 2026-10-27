@@ -190,6 +190,8 @@ async function main(): Promise<void> {
       procedure: PROCEDURE,
       state: "no step is completed yet",
       previous_tracks: null,
+      recent_summaries: [],
+      prompt_cache_key: null,
       effort,
       timeout_ms: SPARK_TIMEOUT_MS,
     }),
