@@ -20,7 +20,8 @@ export interface ObserveInput {
   // The steps and rules this segment asks about; the schema still names every step and rule, so
   // the cached prefix and the schema stay the same across segments.
   window: { step_ids: readonly string[]; rule_ids: readonly string[] };
-  // The previous segment's tracks summary; null for the first segment.
+  // The tracks summary of the latest earlier segment whose SAM calls had finished, naming that
+  // segment; null when there is none.
   previous_tracks: string | null;
   // Summaries of the segments before this one, oldest first.
   recent_summaries: readonly string[];
@@ -83,7 +84,7 @@ export function observePrompt(input: ObserveInput): string {
     `This segment, report only on steps ${windowSteps.length === 0 ? "none" : windowSteps.join(", ")} and hazard rules ${windowRules.length === 0 ? "none" : windowRules.join(", ")}; give no observation for any other step or rule.`,
     `State so far: ${input.state}`,
     `Earlier segments: ${input.recent_summaries.length === 0 ? "none" : input.recent_summaries.join(" | ")}`,
-    `Previous segment's tracks: ${input.previous_tracks ?? "none"}`,
+    `Tracks from an earlier segment: ${input.previous_tracks ?? "none"}`,
   ].join("\n");
 }
 

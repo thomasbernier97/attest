@@ -23,6 +23,9 @@ export const SPARK_EFFORT = "minimal";
 export const WINDOW_STEPS_AFTER_NEXT = 2;
 // Segment summaries Spark sees from the segments before this one.
 export const RECENT_SUMMARIES = 3;
+// Segments whose SAM and Spark calls may run at once. A segment takes about 8 s against one every
+// 4 s (live run 07aa1774), so one at a time falls behind; results are still applied in order.
+export const SEGMENTS_IN_FLIGHT = 3;
 
 // Spend caps, checked before a segment's calls against the worst case for that segment.
 export const SESSION_SPEND_CAP_MICRO_USD = 15_000_000;

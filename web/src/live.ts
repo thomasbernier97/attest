@@ -1,11 +1,15 @@
 // One live session from the browser: one WebSocket that reconnects and resumes from the last event
-// it saw, and segment uploads sent one at a time in order, each retried while the error is retryable.
+// it saw, and segment uploads sent one at a time in order, each retried while the error is retryable
+// for up to UPLOAD_RETRY_MS, long enough to ride out a network cut of 20 s.
 import { ServerMessage } from "@attest/shared";
 import { errorFrom } from "./api";
 import type { Segment } from "./capture";
 
 const RECONNECT_MAX_MS = 10_000;
-const UPLOAD_ATTEMPTS = 4;
+const UPLOAD_RETRY_MS = 60_000;
+const UPLOAD_BACKOFF_MAX_MS = 5_000;
+// One attempt that hangs (a cut that stalls rather than fails) is abandoned after this.
+const UPLOAD_ATTEMPT_MAX_MS = 20_000;
 
 export interface LogEntry {
   at: number;
@@ -137,6 +141,7 @@ export class LiveSession {
       return;
     }
     const sha256 = await sha256Hex(segment.bytes);
+    const firstAttemptAt = Date.now();
     for (let attempt = 1; ; attempt += 1) {
       let retryable = true;
       let detail: string;
@@ -151,6 +156,7 @@ export class LiveSession {
             "X-Segment-Sha256": sha256,
           },
           body: segment.bytes,
+          signal: AbortSignal.timeout(Math.max(1_000, Math.min(UPLOAD_ATTEMPT_MAX_MS, firstAttemptAt + UPLOAD_RETRY_MS - Date.now()))),
         });
         if (response.ok) {
           this.setStatus({ segments_sent: this.status.segments_sent + 1 });
@@ -168,14 +174,15 @@ export class LiveSession {
       } catch (error) {
         detail = error instanceof Error ? error.message : String(error);
       }
-      if (!retryable || attempt >= UPLOAD_ATTEMPTS) {
+      const backoff = Math.min(1_000 * 2 ** (attempt - 1), UPLOAD_BACKOFF_MAX_MS);
+      if (!retryable || Date.now() + backoff - firstAttemptAt > UPLOAD_RETRY_MS) {
         this.uploadsBroken = true;
         this.setStatus({ segments_failed: this.status.segments_failed + 1 });
         this.log("error", "upload", `segment ${String(segment.n)} failed: ${detail}`);
         return;
       }
       this.log("upload", "retry", `segment ${String(segment.n)} attempt ${String(attempt)} failed: ${detail}`);
-      await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, backoff));
     }
   }
 
