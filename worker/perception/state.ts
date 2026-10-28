@@ -4,11 +4,16 @@
 // Rules (Thomas, Oct 26):
 // 1. A step completes when a validated observation says completed at or above the threshold, its
 //    depends_on are complete and it isn't blocked.
-// 2. When a later step is seen before a step it depends on is complete, that step goes unobserved
-//    and the server says "Step N not observed: <instruction>".
+// 2. When a later step is seen (at the higher seen threshold) before a step it depends on is
+//    complete, that step goes unobserved and the server says "Step N not observed: <instruction>".
+//    Only steps in the segment's window are observed, so a skip is caught only when the step seen
+//    is within WINDOW_STEPS_AFTER_NEXT open steps of the next one.
 // 3. A worker_confirm yes completes an unobserved step (a no returns it to pending).
 // 4. A hazard rule is checked only while its step is next: violated blocks the step (severity
-//    block) and speaks the rule's message, satisfied clears it.
+//    block) and speaks the rule's message, satisfied clears it. A violated reading from earlier in
+//    the segment than the moment its step became next is ignored, unless the step itself was
+//    already seen under way before that moment; the step then cannot complete in that segment, so
+//    the next segment checks the rule again.
 // 5. A gapped segment changes nothing.
 import {
   EVENT_VERSION,
@@ -22,7 +27,7 @@ import {
   type StepEvent,
   type StepState,
 } from "@attest/shared";
-import { HAZARD_MIN_CONFIDENCE, STEP_COMPLETE_MIN_CONFIDENCE, STEP_SEEN_MIN_CONFIDENCE } from "./config";
+import { HAZARD_MIN_CONFIDENCE, STEP_COMPLETE_MIN_CONFIDENCE, STEP_SEEN_MIN_CONFIDENCE, WINDOW_STEPS_AFTER_NEXT } from "./config";
 
 // The parts of a procedure the state machine reads.
 export type MachineProcedure = Pick<Procedure, "steps" | "hazard_rules">;
@@ -89,6 +94,42 @@ export function nextStepId(procedure: MachineProcedure, state: MachineState): st
     if (current !== "completed" && current !== "unobserved") return step.id;
   }
   return null;
+}
+
+// What one segment asks about: the next step, the steps after it that are neither completed nor
+// unobserved (up to WINDOW_STEPS_AFTER_NEXT), the hazard rules before those steps, and the objects
+// those steps and rules name. Empty once no step is left.
+export interface ObserveWindow {
+  step_ids: string[];
+  rule_ids: string[];
+  object_labels: string[];
+}
+
+export function observeWindow(procedure: MachineProcedure, state: MachineState): ObserveWindow {
+  const open = procedure.steps.filter((step) => {
+    const current = stepState(state, step.id).state;
+    return current !== "completed" && current !== "unobserved";
+  });
+  const steps = open.slice(0, 1 + WINDOW_STEPS_AFTER_NEXT);
+  const rules = procedure.hazard_rules.filter((rule) => steps.some((step) => step.id === rule.before_step));
+  const labels = new Set([...steps.flatMap((step) => step.expected_objects), ...rules.map((rule) => rule.object_label)]);
+  return { step_ids: steps.map((step) => step.id), rule_ids: rules.map((rule) => rule.id), object_labels: [...labels] };
+}
+
+// Drops the observation entries for steps and rules outside the segment's window.
+export function restrictToWindow(observation: Observation, window: ObserveWindow): { observation: Observation; rejected: string[] } {
+  const rejected: string[] = [];
+  const stepObservations = observation.step_observations.filter((entry) => {
+    const inside = window.step_ids.includes(entry.step_id);
+    if (!inside) rejected.push(`step ${entry.step_id} is outside the window`);
+    return inside;
+  });
+  const hazards = observation.hazards.filter((entry) => {
+    const inside = window.rule_ids.includes(entry.rule_id);
+    if (!inside) rejected.push(`rule ${entry.rule_id} is outside the window`);
+    return inside;
+  });
+  return { observation: { ...observation, step_observations: stepObservations, hazards }, rejected };
 }
 
 // Step states as clients see them: the next step, when pending, is active.
@@ -177,12 +218,23 @@ export function applyObservation(
 
   const withTracks = <T extends EventBase>(event: T): T => ({ ...event, tracks_segment_n: tracksSegmentN });
 
-  // Rule 4, for the step that is next at this point of the pass.
-  const checkHazards = (stepId: string) => {
+  // Rule 4, for the step that is next at this point of the pass; nextSinceMs is the moment in the
+  // segment it became next (0 when it was next from the start).
+  const checkHazards = (stepId: string, nextSinceMs: number) => {
     for (const rule of procedure.hazard_rules) {
       if (rule.before_step !== stepId) continue;
       const seen = byRule.get(rule.id);
       if (seen === undefined || seen.state === "cannot_tell" || seen.confidence < HAZARD_MIN_CONFIDENCE) continue;
+      // Live, a bare hand at 0.2 s read as a gloves violation after step 1 completed at 1.5 s. A
+      // violation while the worker was already doing the guarded step still counts.
+      const guarded = byStep.get(stepId);
+      const startedEarly = (guarded?.state === "in_progress" || guarded?.state === "completed") && guarded.evidence.moment_ms < nextSinceMs;
+      if (seen.state === "violated" && seen.evidence.moment_ms < nextSinceMs && !startedEarly) {
+        rejected.push(`rule ${rule.id} violated at ${String(seen.evidence.moment_ms)} ms, before its step was next at ${String(nextSinceMs)} ms`);
+        // A violation that lasts the whole segment reads the same, so the step waits a segment.
+        heldBack.add(stepId);
+        continue;
+      }
       const hazard = hazardState(state, rule.id);
       const step = stepState(state, stepId);
       const sessionMs = ctx.segment_started_ms + seen.evidence.moment_ms;
@@ -220,9 +272,12 @@ export function applyObservation(
   const isComplete = (stepId: string) => stepState(state, stepId).state === "completed";
 
   // Rule 4 then rule 1, step by step in ordinal order, so a step that completes makes the next one
-  // next within the same segment.
+  // next within the same segment, from the moment it completed.
+  let nextSinceMs = 0;
+  // Steps whose hazard reading was ignored above; they cannot complete in this segment.
+  const heldBack = new Set<string>();
   for (const step of procedure.steps) {
-    if (nextStepId(procedure, state) === step.id) checkHazards(step.id);
+    if (nextStepId(procedure, state) === step.id) checkHazards(step.id, nextSinceMs);
     const seen = byStep.get(step.id);
     if (seen?.state !== "completed") continue;
     if (!step.depends_on.every(isComplete)) {
@@ -233,6 +288,10 @@ export function applyObservation(
     }
     const current = stepState(state, step.id);
     if (current.state === "completed" || current.state === "blocked" || seen.confidence < STEP_COMPLETE_MIN_CONFIDENCE) continue;
+    if (heldBack.has(step.id)) {
+      rejected.push(`step ${String(step.ordinal)} held back a segment: its hazard reading came before it was next`);
+      continue;
+    }
     const sessionMs = ctx.segment_started_ms + seen.evidence.moment_ms;
     const event: StepEvent = withTracks({
       ...base(ctx, sessionMs, "observation", seen.confidence, seen.evidence.description, eventKey(ctx, "step_completed", step.id)),
@@ -241,6 +300,7 @@ export function applyObservation(
     });
     events.push(event);
     Object.assign(current, { state: "completed", updated_ms: sessionMs, event_id: event.id });
+    nextSinceMs = Math.max(nextSinceMs, seen.evidence.moment_ms);
   }
 
   // Rule 2: a step seen while a step it depends on is not complete leaves that step unobserved.

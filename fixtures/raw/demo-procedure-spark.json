@@ -13,16 +13,6 @@
       "type": "json_schema",
       "name": "procedure_draft",
       "schema": {
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "v",
-          "title",
-          "language",
-          "steps",
-          "objects",
-          "hazard_rules"
-        ],
         "properties": {
           "hazard_rules": {
             "items": {
@@ -105,6 +95,18 @@
             "minItems": 1,
             "type": "array"
           },
+          "starting_state": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "steps": {
             "items": {
               "additionalProperties": false,
@@ -174,7 +176,18 @@
             "const": 1,
             "type": "number"
           }
-        }
+        },
+        "required": [
+          "v",
+          "title",
+          "language",
+          "starting_state",
+          "steps",
+          "objects",
+          "hazard_rules"
+        ],
+        "type": "object",
+        "additionalProperties": false
       },
       "strict": true
     }
@@ -182,28 +195,28 @@
   "tools": [],
   "tool_choice": "auto",
   "truncation": "disabled",
-  "id": "resp_6adfea6a21976c5d8edd4c2c",
+  "id": "resp_6ae14e5456698124da31470c",
   "object": "response",
   "status": "completed",
-  "created_at": 1793059434,
-  "completed_at": 1793059434,
+  "created_at": 1793150548,
+  "completed_at": 1793150548,
   "error": null,
   "incomplete_details": null,
   "output": [
     {
       "type": "reasoning",
-      "id": "rs_6adfea6a21976c5d8edd4c2c:rs_c7248418-a212-4723-b6a7-64da9c9f4c8c",
+      "id": "rs_6ae14e5456698124da31470c:rs_8a83a012-d916-4c5f-9fd3-e161c063c718",
       "summary": [],
       "status": "completed"
     },
     {
       "type": "message",
-      "id": "msg_3ef9cb49-3664-46d2-adc9-e9b489c5f1d1",
+      "id": "msg_2d36de05-6621-4fc2-9849-5172bede0542",
       "role": "assistant",
       "content": [
         {
           "type": "output_text",
-          "text": "{\"hazard_rules\": [{\"before_step\": 2, \"condition\": \"both hands are in the work gloves\", \"condition_kind\": \"object_state\", \"message\": \"Put on work gloves before touching fan, bracket or screwdriver.\", \"object_label\": \"work_gloves\", \"severity\": \"block\"}, {\"before_step\": 6, \"condition\": \"power strip switch is off and its light is out\", \"condition_kind\": \"object_state\", \"message\": \"Switch power strip off before connecting fan cable.\", \"object_label\": \"power_strip\", \"severity\": \"block\"}], \"language\": \"en\", \"objects\": [{\"display_name\": \"Work gloves\", \"label\": \"work_gloves\", \"prompt\": \"gloves\"}, {\"display_name\": \"Case fan\", \"label\": \"case_fan\", \"prompt\": \"case fan\"}, {\"display_name\": \"Taped square\", \"label\": \"taped_square\", \"prompt\": \"tape square\"}, {\"display_name\": \"Screwdriver\", \"label\": \"screwdriver\", \"prompt\": \"screwdriver\"}, {\"display_name\": \"Tool tray\", \"label\": \"tool_tray\", \"prompt\": \"tool tray\"}, {\"display_name\": \"Mounting bracket\", \"label\": \"mounting_bracket\", \"prompt\": \"metal bracket\"}, {\"display_name\": \"Fan controller\", \"label\": \"fan_controller\", \"prompt\": \"USB fan controller\"}, {\"display_name\": \"Power strip\", \"label\": \"power_strip\", \"prompt\": \"power strip\"}], \"steps\": [{\"completion_cue\": \"both hands are in the work gloves\", \"cue_kind\": \"worker_action\", \"depends_on\": [], \"expected_objects\": [\"work_gloves\"], \"instruction\": \"Put on the gloves.\", \"ordinal\": 1}, {\"completion_cue\": \"the fan lies flat inside the square\", \"cue_kind\": \"object_placed\", \"depends_on\": [], \"expected_objects\": [\"case_fan\", \"taped_square\"], \"instruction\": \"Place the case fan flat inside the taped square.\", \"ordinal\": 2}, {\"completion_cue\": \"the screwdriver is out of the tray\", \"cue_kind\": \"object_placed\", \"depends_on\": [], \"expected_objects\": [\"screwdriver\", \"tool_tray\"], \"instruction\": \"Take the screwdriver out of the tool tray.\", \"ordinal\": 3}, {\"completion_cue\": \"the bracket sits on the fan with both screws in\", \"cue_kind\": \"object_state\", \"depends_on\": [2, 3], \"expected_objects\": [\"mounting_bracket\", \"case_fan\"], \"instruction\": \"Install the bracket. Set the mounting bracket on the fan so its holes line up with two opposite corner holes, and fasten it with the two screws.\", \"ordinal\": 4}, {\"completion_cue\": \"the fan stands on its bracket beside the controller\", \"cue_kind\": \"object_placed\", \"depends_on\": [4], \"expected_objects\": [\"case_fan\", \"mounting_bracket\", \"fan_controller\"], \"instruction\": \"Stand the fan upright on its bracket, next to the fan controller.\", \"ordinal\": 5}, {\"completion_cue\": \"the fan cable is plugged into the controller\", \"cue_kind\": \"object_state\", \"depends_on\": [5], \"expected_objects\": [\"case_fan\", \"fan_controller\"], \"instruction\": \"Connect the fan cable to the fan controller.\", \"ordinal\": 6}, {\"completion_cue\": \"the fan blades are spinning\", \"cue_kind\": \"object_state\", \"depends_on\": [6], \"expected_objects\": [\"case_fan\", \"power_strip\"], \"instruction\": \"Switch the power strip on and check the fan.\", \"ordinal\": 7}, {\"completion_cue\": \"the screwdriver is back in the tray\", \"cue_kind\": \"object_placed\", \"depends_on\": [3], \"expected_objects\": [\"screwdriver\", \"tool_tray\"], \"instruction\": \"Return the screwdriver to the tool tray.\", \"ordinal\": 8}], \"title\": \"Replace the cooling fan: mount the case fan on its bracket and connect it to the fan controller\", \"v\": 1}",
+          "text": "{\"hazard_rules\": [{\"before_step\": 2, \"condition\": \"worker is wearing blue nitrile gloves on both hands\", \"condition_kind\": \"object_state\", \"message\": \"Put on blue nitrile gloves before touching the fan or tools.\", \"object_label\": \"gloves\", \"severity\": \"block\"}, {\"before_step\": 6, \"condition\": \"power strip is switched off and its switch light is out\", \"condition_kind\": \"object_state\", \"message\": \"Switch the power strip off before connecting the fan cable.\", \"object_label\": \"power_strip\", \"severity\": \"block\"}], \"language\": \"en\", \"objects\": [{\"display_name\": \"Blue nitrile gloves\", \"label\": \"gloves\", \"prompt\": \"blue nitrile gloves\"}, {\"display_name\": \"Computer case fan\", \"label\": \"case_fan\", \"prompt\": \"black computer case fan\"}, {\"display_name\": \"Taped work square\", \"label\": \"taped_square\", \"prompt\": \"blue taped square\"}, {\"display_name\": \"Screwdriver\", \"label\": \"screwdriver\", \"prompt\": \"screwdriver\"}, {\"display_name\": \"Mounting bracket\", \"label\": \"mounting_bracket\", \"prompt\": \"black metal mounting bracket\"}, {\"display_name\": \"Tool tray\", \"label\": \"tool_tray\", \"prompt\": \"yellow tool tray\"}, {\"display_name\": \"Fan controller\", \"label\": \"fan_controller\", \"prompt\": \"USB fan controller\"}, {\"display_name\": \"Power strip\", \"label\": \"power_strip\", \"prompt\": \"white power strip\"}], \"starting_state\": \"Blue nitrile gloves, black computer case fan with unconnected fan cable, and black mounting bracket on desk. Screwdriver and two screws in yellow tool tray. Fan controller plugged into power strip, power strip switched on with switch lit. Blue taped square in middle of desk.\", \"steps\": [{\"completion_cue\": \"both hands are in the blue nitrile gloves\", \"cue_kind\": \"worker_action\", \"depends_on\": [], \"expected_objects\": [\"gloves\"], \"instruction\": \"Put on the blue nitrile gloves.\", \"ordinal\": 1}, {\"completion_cue\": \"the fan lies flat inside the square\", \"cue_kind\": \"object_placed\", \"depends_on\": [], \"expected_objects\": [\"case_fan\", \"taped_square\"], \"instruction\": \"Place the computer case fan flat inside the blue taped square.\", \"ordinal\": 2}, {\"completion_cue\": \"the screwdriver is out of the yellow tray\", \"cue_kind\": \"object_placed\", \"depends_on\": [], \"expected_objects\": [\"screwdriver\", \"tool_tray\"], \"instruction\": \"Take the screwdriver out of the yellow tool tray.\", \"ordinal\": 3}, {\"completion_cue\": \"the bracket sits on the fan with both screws in\", \"cue_kind\": \"object_state\", \"depends_on\": [2, 3], \"expected_objects\": [\"mounting_bracket\", \"case_fan\"], \"instruction\": \"Install the black metal bracket. Set the mounting bracket on the fan so its holes line up with two opposite corner holes, and fasten it with the two screws.\", \"ordinal\": 4}, {\"completion_cue\": \"the fan stands on its bracket beside the controller\", \"cue_kind\": \"object_placed\", \"depends_on\": [4], \"expected_objects\": [\"case_fan\", \"mounting_bracket\", \"fan_controller\"], \"instruction\": \"Stand the fan upright on its bracket, next to the fan controller.\", \"ordinal\": 5}, {\"completion_cue\": \"the fan cable is plugged into the controller\", \"cue_kind\": \"object_state\", \"depends_on\": [5], \"expected_objects\": [\"fan_controller\", \"case_fan\"], \"instruction\": \"Connect the fan cable to the fan controller.\", \"ordinal\": 6}, {\"completion_cue\": \"the fan blades are spinning\", \"cue_kind\": \"object_state\", \"depends_on\": [6], \"expected_objects\": [\"case_fan\", \"power_strip\"], \"instruction\": \"Switch the power strip on and check the fan.\", \"ordinal\": 7}, {\"completion_cue\": \"the screwdriver is back in the tray\", \"cue_kind\": \"object_placed\", \"depends_on\": [3], \"expected_objects\": [\"screwdriver\", \"tool_tray\"], \"instruction\": \"Return the screwdriver to the tool tray.\", \"ordinal\": 8}], \"title\": \"Replace the computer cooling fan: mount the computer case fan on its bracket and connect it to the fan controller\", \"v\": 1}",
           "annotations": [],
           "logprobs": []
         }
@@ -213,15 +226,15 @@
   ],
   "instructions": null,
   "usage": {
-    "input_tokens": 1004,
+    "input_tokens": 1089,
     "input_tokens_details": {
       "cached_tokens": 0
     },
-    "output_tokens": 11385,
+    "output_tokens": 8423,
     "output_tokens_details": {
-      "reasoning_tokens": 10493
+      "reasoning_tokens": 7440
     },
-    "total_tokens": 12389
+    "total_tokens": 9512
   },
   "parallel_tool_calls": true,
   "store": true

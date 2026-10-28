@@ -109,6 +109,8 @@ function ReviewScreen({ procedure, onApproved, onStart }: { procedure: Procedure
       <p>
         {approved ? `Approved ${new Date(procedure.approved_at ?? 0).toLocaleString()}.` : "Not approved yet. Check the steps, objects and rules, then approve."}
       </p>
+      <h2>Before step 1</h2>
+      <p>{procedure.starting_state ?? "The text gives no starting arrangement."}</p>
       <h2>Steps</h2>
       <table>
         <thead>

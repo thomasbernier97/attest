@@ -1,21 +1,22 @@
 {
   "v": 1,
-  "title": "Replace the cooling fan: mount the case fan on its bracket and connect it to the fan controller",
+  "title": "Replace the computer cooling fan: mount the computer case fan on its bracket and connect it to the fan controller",
   "language": "en",
+  "starting_state": "Blue nitrile gloves, black computer case fan with unconnected fan cable, and black mounting bracket on desk. Screwdriver and two screws in yellow tool tray. Fan controller plugged into power strip, power strip switched on with switch lit. Blue taped square in middle of desk.",
   "steps": [
     {
       "ordinal": 1,
-      "instruction": "Put on the gloves.",
+      "instruction": "Put on the blue nitrile gloves.",
       "expected_objects": [
-        "work_gloves"
+        "gloves"
       ],
-      "completion_cue": "both hands are in the work gloves",
+      "completion_cue": "both hands are in the blue nitrile gloves",
       "cue_kind": "worker_action",
       "depends_on": []
     },
     {
       "ordinal": 2,
-      "instruction": "Place the case fan flat inside the taped square.",
+      "instruction": "Place the computer case fan flat inside the blue taped square.",
       "expected_objects": [
         "case_fan",
         "taped_square"
@@ -26,18 +27,18 @@
     },
     {
       "ordinal": 3,
-      "instruction": "Take the screwdriver out of the tool tray.",
+      "instruction": "Take the screwdriver out of the yellow tool tray.",
       "expected_objects": [
         "screwdriver",
         "tool_tray"
       ],
-      "completion_cue": "the screwdriver is out of the tray",
+      "completion_cue": "the screwdriver is out of the yellow tray",
       "cue_kind": "object_placed",
       "depends_on": []
     },
     {
       "ordinal": 4,
-      "instruction": "Install the bracket. Set the mounting bracket on the fan so its holes line up with two opposite corner holes, and fasten it with the two screws.",
+      "instruction": "Install the black metal bracket. Set the mounting bracket on the fan so its holes line up with two opposite corner holes, and fasten it with the two screws.",
       "expected_objects": [
         "mounting_bracket",
         "case_fan"
@@ -67,8 +68,8 @@
       "ordinal": 6,
       "instruction": "Connect the fan cable to the fan controller.",
       "expected_objects": [
-        "case_fan",
-        "fan_controller"
+        "fan_controller",
+        "case_fan"
       ],
       "completion_cue": "the fan cable is plugged into the controller",
       "cue_kind": "object_state",
@@ -105,19 +106,19 @@
   ],
   "objects": [
     {
-      "label": "work_gloves",
-      "display_name": "Work gloves",
-      "prompt": "gloves"
+      "label": "gloves",
+      "display_name": "Blue nitrile gloves",
+      "prompt": "blue nitrile gloves"
     },
     {
       "label": "case_fan",
-      "display_name": "Case fan",
-      "prompt": "case fan"
+      "display_name": "Computer case fan",
+      "prompt": "black computer case fan"
     },
     {
       "label": "taped_square",
-      "display_name": "Taped square",
-      "prompt": "tape square"
+      "display_name": "Taped work square",
+      "prompt": "blue taped square"
     },
     {
       "label": "screwdriver",
@@ -125,14 +126,14 @@
       "prompt": "screwdriver"
     },
     {
-      "label": "tool_tray",
-      "display_name": "Tool tray",
-      "prompt": "tool tray"
-    },
-    {
       "label": "mounting_bracket",
       "display_name": "Mounting bracket",
-      "prompt": "metal bracket"
+      "prompt": "black metal mounting bracket"
+    },
+    {
+      "label": "tool_tray",
+      "display_name": "Tool tray",
+      "prompt": "yellow tool tray"
     },
     {
       "label": "fan_controller",
@@ -142,25 +143,25 @@
     {
       "label": "power_strip",
       "display_name": "Power strip",
-      "prompt": "power strip"
+      "prompt": "white power strip"
     }
   ],
   "hazard_rules": [
     {
-      "condition": "both hands are in the work gloves",
+      "condition": "worker is wearing blue nitrile gloves on both hands",
       "condition_kind": "object_state",
-      "object_label": "work_gloves",
+      "object_label": "gloves",
       "before_step": 2,
       "severity": "block",
-      "message": "Put on work gloves before touching fan, bracket or screwdriver."
+      "message": "Put on blue nitrile gloves before touching the fan or tools."
     },
     {
-      "condition": "power strip switch is off and its light is out",
+      "condition": "power strip is switched off and its switch light is out",
       "condition_kind": "object_state",
       "object_label": "power_strip",
       "before_step": 6,
       "severity": "block",
-      "message": "Switch power strip off before connecting fan cable."
+      "message": "Switch the power strip off before connecting the fan cable."
     }
   ]
 }

@@ -24,13 +24,15 @@ import {
   SAY_MS_PER_WORD,
   SPARK_WORST_CASE_TOKENS,
 } from "../perception/config";
-import { runSegment, tracksSummary } from "../perception/segment";
+import { runSegment, tracksSummary, windowObjects } from "../perception/segment";
 import {
   applyConfirm,
   applyObservation,
   clientStepStates,
   gapEvent,
   initialState,
+  observeWindow,
+  restrictToWindow,
   speakingMs,
   stateText,
   type EventContext,
@@ -223,12 +225,12 @@ export class SessionDO extends DurableObject<Env> {
     };
   }
 
-  private worstCaseCost(st: Stored, segment: SegmentRecord): number {
+  private worstCaseCost(st: Stored, segment: SegmentRecord, samCalls: number): number {
     const frames = Math.ceil((Math.max(segment.duration_ms, st.session.segment_ms) * st.session.fps) / 1000);
     const usage = { tokens_in: 0, tokens_cached: 0, tokens_out: 0, media_units: 0, media_unit_kind: "none" } as const;
     const sam = callCost({ ...usage, model: "sam-3.1", media_units: frames, media_unit_kind: "frames" });
     const spark = callCost({ ...usage, model: "muse-spark-1.3", ...SPARK_WORST_CASE_TOKENS });
-    return sam * st.procedure.objects.length + spark;
+    return sam * samCalls + spark;
   }
 
   private async process(st: Stored, segment: SegmentRecord): Promise<void> {
@@ -238,8 +240,17 @@ export class SessionDO extends DurableObject<Env> {
     await updateSegmentState(this.env.DB, session.id, segment.n, "processing");
     this.broadcast({ type: "segment_ack", n: segment.n, state: "processing" });
 
+    // The steps, rules and objects this segment asks about, from the machine as it stands now.
+    const window = observeWindow(procedure, st.machine);
+    if (window.step_ids.length === 0) {
+      // No step is left to observe, so the segment is not sent to SAM or Spark.
+      st.previous_tracks = null;
+      await this.finish(st, segment, null);
+      return;
+    }
+    const samCalls = windowObjects(procedure, window).length;
     const spend = await spendSoFar(this.env.DB, session.id, Date.now());
-    const worst = this.worstCaseCost(st, segment);
+    const worst = this.worstCaseCost(st, segment, samCalls);
     if (spend.session + worst > session.spend_cap_micro_usd || spend.daily + worst > DAILY_SPEND_CAP_MICRO_USD) {
       st.previous_tracks = null;
       const rationale = "The spend cap would be passed, so the segment was not sent to SAM or Spark.";
@@ -251,17 +262,19 @@ export class SessionDO extends DurableObject<Env> {
     // From here on the previous segment is this one: its tracks, or none when SAM failed on it.
     st.previous_tracks = null;
     const result = await runSegment(
-      { apiKey: this.env.META_API_KEY, requestsLeft: procedure.objects.length + 1 },
+      { apiKey: this.env.META_API_KEY, requestsLeft: samCalls + 1 },
       {
         session_id: session.id,
         segment_n: segment.n,
         file_id: segment.file_id,
         fps: session.fps,
         segment_ms: segment.duration_ms,
+        nominal_segment_ms: session.segment_ms,
         frame_w: segment.frame_w,
         frame_h: segment.frame_h,
         procedure,
         state_text: stateText(procedure, st.machine),
+        window,
         recent_summaries: st.summaries,
         previous_tracks: previousTracks,
         timeout_ms: MODEL_TIMEOUT_MS,
@@ -299,12 +312,14 @@ export class SessionDO extends DurableObject<Env> {
       return;
     }
 
-    // State changes are applied to the machine as it stands now, after the awaits above.
-    const transition = applyObservation(procedure, st.machine, result.observation, ctx, segment.n);
+    // State changes are applied to the machine as it stands now, after the awaits above, and only
+    // from the entries about the window this segment asked about.
+    const windowed = restrictToWindow(result.observation, window);
+    const transition = applyObservation(procedure, st.machine, windowed.observation, ctx, segment.n);
     st.machine = transition.state;
     st.summaries = [...st.summaries, result.observation.segment_summary].slice(-RECENT_SUMMARIES);
     console.log("observation", segment.n, JSON.stringify(result.observation));
-    for (const rejected of transition.rejected) console.log("observation rejected", segment.n, rejected);
+    for (const rejected of [...windowed.rejected, ...transition.rejected]) console.log("observation rejected", segment.n, rejected);
     await this.save();
     await this.finish(st, segment, null, transition.events, transition.says);
   }

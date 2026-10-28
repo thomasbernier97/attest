@@ -56,6 +56,7 @@ export function mintProcedure(draft: ProcedureDraft, sourceHash: string, now: nu
     compiled_at: now,
     approved_at: null,
     approved_by: null,
+    starting_state: draft.starting_state,
     steps: draft.steps.map((step) => ({
       ...step,
       id: idOf(step.ordinal),

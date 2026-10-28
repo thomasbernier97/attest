@@ -1,11 +1,13 @@
 // Thresholds and limits for the segment pipeline and the state machine. Contracts never carry these.
 
-export const THRESHOLDS_VERSION = "2026-10-26";
+export const THRESHOLDS_VERSION = "2026-10-27";
 
 // Rule 1: a validated "completed" observation at or above this completes the step.
 export const STEP_COMPLETE_MIN_CONFIDENCE = 0.7;
-// Rule 2: an observation of a step at or above this counts as the step being seen.
-export const STEP_SEEN_MIN_CONFIDENCE = 0.7;
+// Rule 2: an observation of a step at or above this counts as the step being seen. Higher than
+// rule 1's, because a skip is spoken aloud (try 2 marked steps 2 and 3 unobserved on a step 4 "in
+// progress" at 0.85 while the bracket lay where the setup put it).
+export const STEP_SEEN_MIN_CONFIDENCE = 0.9;
 // Rule 4: a hazard observation at or above this changes the rule's state.
 export const HAZARD_MIN_CONFIDENCE = 0.7;
 
@@ -17,6 +19,8 @@ export const SESSION_TIME_CAP_MS = 600_000;
 export const MODEL_TIMEOUT_MS = 20_000;
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const SPARK_EFFORT = "minimal";
+// Steps after the next one that a segment asks about; SAM tracks only their objects.
+export const WINDOW_STEPS_AFTER_NEXT = 2;
 // Segment summaries Spark sees from the segments before this one.
 export const RECENT_SUMMARIES = 3;
 

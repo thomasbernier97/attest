@@ -9,7 +9,7 @@ export const SPARK_MODEL = "muse-spark-1.3";
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
 
 // The parts of a procedure the observation prompt and schema use.
-export type ObservedProcedure = Pick<Procedure, "title" | "steps" | "objects" | "hazard_rules">;
+export type ObservedProcedure = Pick<Procedure, "title" | "starting_state" | "steps" | "objects" | "hazard_rules">;
 
 export interface ObserveInput {
   file_id: string;
@@ -17,6 +17,9 @@ export interface ObserveInput {
   procedure: ObservedProcedure;
   // Plain-text step states so far, from the state machine.
   state: string;
+  // The steps and rules this segment asks about; the schema still names every step and rule, so
+  // the cached prefix and the schema stay the same across segments.
+  window: { step_ids: readonly string[]; rule_ids: readonly string[] };
   // The previous segment's tracks summary; null for the first segment.
   previous_tracks: string | null;
   // Summaries of the segments before this one, oldest first.
@@ -58,6 +61,9 @@ export function observePrompt(input: ObserveInput): string {
   );
   const objects = procedure.objects.map((object) => `${object.label}: ${object.display_name}`);
   const rules = procedure.hazard_rules.map((rule) => `id ${rule.id}: ${rule.condition} (${rule.severity})`);
+  const ordinalOf = (id: string) => String(procedure.steps.find((step) => step.id === id)?.ordinal);
+  const windowSteps = input.window.step_ids.map((id) => `${ordinalOf(id)} (id ${id})`);
+  const windowRules = input.window.rule_ids.map((id) => `id ${id}`);
   return [
     `You watch one ${String(input.segment_ms / 1000)}-second video segment of a worker at a bench following a written procedure.`,
     `Procedure: ${procedure.title}`,
@@ -67,9 +73,14 @@ export function observePrompt(input: ObserveInput): string {
     ...objects,
     "Hazard rules:",
     ...(rules.length === 0 ? ["none"] : rules),
+    `Before step 1 the camera sees: ${procedure.starting_state ?? "the text does not say."}`,
+    "That starting arrangement completes no step and is no progress on any step: an object still lying where it started, or picked up and set down again, is not progress. Only a step whose Done when puts an object back where it started is completed by it.",
+    "in_progress means this segment shows the worker doing that step's own action, with its end state partly in place. completed means the step's \"Done when\" holds at the end of this segment; a step the worker is still doing when the segment ends is in_progress. For a completed step, moment_ms is the first moment its \"Done when\" holds; for an in_progress step, the first moment the worker is seen doing it; for a hazard rule, the last moment its reported state is seen.",
+    "A step none of whose objects the worker has touched or moved from where they started is not_observed, not in_progress.",
     "Report only what this segment shows. Give a step observation only for a step this segment shows evidence about; use cannot_tell instead of guessing.",
     "moment_ms is milliseconds from the start of this segment. segment_summary is at most 60 words; each evidence description is at most 25 words.",
     // Everything above is the same for every segment of a procedure, so it is the cached prefix.
+    `This segment, report only on steps ${windowSteps.length === 0 ? "none" : windowSteps.join(", ")} and hazard rules ${windowRules.length === 0 ? "none" : windowRules.join(", ")}; give no observation for any other step or rule.`,
     `State so far: ${input.state}`,
     `Earlier segments: ${input.recent_summaries.length === 0 ? "none" : input.recent_summaries.join(" | ")}`,
     `Previous segment's tracks: ${input.previous_tracks ?? "none"}`,

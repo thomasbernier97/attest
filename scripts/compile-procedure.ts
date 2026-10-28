@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   save(`fixtures/ProcedureDraft/${name}.json`, JSON.stringify(call.draft, null, 2));
 
   const { draft } = call;
-  console.log(`\n${draft.title} (${draft.language})\n\nSteps:`);
+  console.log(`\n${draft.title} (${draft.language})\n\nBefore step 1: ${draft.starting_state ?? "none"}\n\nSteps:`);
   for (const step of draft.steps) {
     console.log(
       `  ${String(step.ordinal)}. ${step.instruction}\n     cue (${step.cue_kind}): ${step.completion_cue}\n` +
