@@ -19,6 +19,9 @@ export const SESSION_TIME_CAP_MS = 600_000;
 export const MODEL_TIMEOUT_MS = 20_000;
 export const UPLOAD_TIMEOUT_MS = 30_000;
 export const SPARK_EFFORT = "minimal";
+// Cap on Spark's output tokens, reasoning included: twice the largest output (1,034 tokens) over 30
+// calls on 07aa1774's segments. A reply cut off at the cap is incomplete, so the segment is a gap.
+export const SPARK_MAX_OUTPUT_TOKENS = 2_068;
 // Steps after the next one that a segment asks about; SAM tracks only their objects.
 export const WINDOW_STEPS_AFTER_NEXT = 2;
 // Segment summaries Spark sees from the segments before this one.
@@ -31,6 +34,6 @@ export const SEGMENTS_IN_FLIGHT = 3;
 export const SESSION_SPEND_CAP_MICRO_USD = 15_000_000;
 export const DAILY_SPEND_CAP_MICRO_USD = 30_000_000;
 // Worst-case Spark usage for one segment, for the spend check.
-export const SPARK_WORST_CASE_TOKENS = { tokens_in: 20_000, tokens_out: 4_000 };
+export const SPARK_WORST_CASE_TOKENS = { tokens_in: 20_000, tokens_out: SPARK_MAX_OUTPUT_TOKENS };
 // Speaking time the browser keeps listening suppressed for, per word of a say message.
 export const SAY_MS_PER_WORD = 400;

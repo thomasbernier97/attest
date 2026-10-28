@@ -138,6 +138,8 @@ app.get("/api/sessions/:id/ws", async (c) => {
 const SegmentHeaders = z.object({
   started_ms: z.coerce.number().pipe(z.int().nonnegative()),
   duration_ms: z.coerce.number().pipe(z.int().min(1).max(10_000)),
+  // Epoch ms on the browser's clock; latency_ms counts from it.
+  capture_ended_at: z.coerce.number().pipe(z.int().positive()),
   sha256: Sha256Hex,
 });
 
@@ -151,6 +153,7 @@ app.put("/api/sessions/:id/segments/:n", async (c) => {
   const headers = SegmentHeaders.safeParse({
     started_ms: c.req.header("X-Segment-Started-Ms"),
     duration_ms: c.req.header("X-Segment-Duration-Ms"),
+    capture_ended_at: c.req.header("X-Segment-Ended-At"),
     sha256: c.req.header("X-Segment-Sha256")?.toLowerCase(),
   });
   if (!headers.success) return fail(c, "invalid_request", z.prettifyError(headers.error));

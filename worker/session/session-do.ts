@@ -86,6 +86,7 @@ export interface SegmentPut {
   sha256: string;
   started_ms: number;
   duration_ms: number;
+  capture_ended_at: number;
   bytes: ArrayBuffer;
 }
 
@@ -200,6 +201,7 @@ export class SessionDO extends DurableObject<Env> {
       file_id: fileId,
       started_ms: put.started_ms,
       duration_ms: put.duration_ms,
+      capture_ended_at: put.capture_ended_at,
       frame_w: size.width,
       frame_h: size.height,
       received_at: Date.now(),
@@ -310,12 +312,11 @@ export class SessionDO extends DurableObject<Env> {
   }
 
   private context(st: Stored, segment: SegmentRecord): EventContext {
-    const startedAt = st.session.started_at ?? segment.received_at;
     return {
       session_id: st.session.id,
       segment_n: segment.n,
       segment_started_ms: segment.started_ms,
-      segment_end_at: startedAt + segment.started_ms + segment.duration_ms,
+      segment_end_at: segment.capture_ended_at,
       detected_at: Date.now(),
       clip_key: segment.r2_key,
       newId: () => crypto.randomUUID(),

@@ -49,7 +49,8 @@ export interface EventContext {
   segment_n: number;
   // Session-relative start of the segment.
   segment_started_ms: number;
-  // Wall-clock end of the segment: session started_at + started_ms + duration_ms.
+  // When capture of the segment ended, on the browser's clock (X-Segment-Ended-At); latency_ms
+  // counts from it.
   segment_end_at: number;
   detected_at: number;
   clip_key: string | null;
@@ -138,13 +139,13 @@ export function clientStepStates(procedure: MachineProcedure, state: MachineStat
   return state.steps.map((step) => (step.step_id === next && step.state === "pending" ? { ...step, state: "active" } : { ...step }));
 }
 
-// Plain-text states for the observation prompt.
+// Plain-text states for the observation prompt, which names rules by number.
 export function stateText(procedure: Pick<Procedure, "steps" | "hazard_rules">, state: MachineState): string {
   const steps = clientStepStates(procedure, state).map((step) => {
     const ordinal = procedure.steps.find((candidate) => candidate.id === step.step_id)?.ordinal;
     return `step ${String(ordinal)} ${step.state}`;
   });
-  const hazards = state.hazards.map((hazard) => `rule ${hazard.rule_id} ${hazard.state}`);
+  const hazards = state.hazards.map((hazard) => `rule ${String(procedure.hazard_rules.findIndex((rule) => rule.id === hazard.rule_id) + 1)} ${hazard.state}`);
   return [...steps, ...hazards].join("; ");
 }
 

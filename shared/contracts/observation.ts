@@ -1,5 +1,6 @@
-// What Muse Spark returns for one segment. The schema sent to the model is built per procedure
-// with observationSchemaFor, so step ids, rule ids and labels are enums of that procedure's values.
+// What Muse Spark saw in one segment. Spark replies by step and rule number (worker/perception/
+// spark.ts); the server maps the reply to ids and validates it with observationSchemaFor, so step
+// ids, rule ids and labels are enums of that procedure's values.
 import { z } from "zod";
 import { Confidence, ObjectLabel, Uuid, words } from "./common";
 
@@ -29,12 +30,12 @@ function observationSchema(fields: Fields) {
       evidence: z.object({
         object_labels: z.array(fields.label),
         moment_ms: moment,
-        description: words(25),
+        description: words(12),
       }),
     }),
   );
   return z.object({
-    segment_summary: words(60),
+    segment_summary: words(25),
     worker_activity: WorkerActivity,
     step_observations: z.array(
       z.object({
@@ -44,7 +45,7 @@ function observationSchema(fields: Fields) {
         evidence: z.object({
           object_labels: z.array(fields.label),
           moment_ms: moment,
-          description: words(25),
+          description: words(12),
         }),
       }),
     ),

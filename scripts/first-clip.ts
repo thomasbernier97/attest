@@ -196,6 +196,7 @@ async function main(): Promise<void> {
       recent_summaries: [],
       prompt_cache_key: null,
       effort,
+      max_output_tokens: null,
       timeout_ms: SPARK_TIMEOUT_MS,
     }),
   ]);

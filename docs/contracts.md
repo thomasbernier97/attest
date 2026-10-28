@@ -8,6 +8,8 @@
 
 > **Amended Oct 26, 2026 for the observe window (Thomas).** `ProcedureDraft` and `Procedure` carry `starting_state`, what the camera sees before step 1, so the observation prompt can state that the starting arrangement completes no step.
 
+> **Amended Oct 27, 2026 for Spark latency (Thomas).** Each segment PUT carries `X-Segment-Ended-At`, when the segment's capture ended on the browser's clock, and `latency_ms` counts from it rather than from segment 0's arrival at the server. Spark no longer replies with the `Observation` itself: it replies by step and rule number with only what the segment shows, and the server maps that to an `Observation`, whose evidence descriptions are capped at 12 words and summary at 25.
+
 > 📏 Field-level specification of every contract in the spec's section 7, plus the conventions all seats share. Written Oct 24, 2026 as prose so the Day 1 Zod commit (ATT-15) is transcription. At kickoff this page becomes `docs/contracts.md` (ATT-12) and stops being edited here. Where this page tightens or changes the spec table, the change is listed at the end and goes through the spec's change log.
 
 ## Conventions every seat follows
@@ -17,11 +19,11 @@ These decide the things five seats would otherwise each decide differently. A se
 | Convention | Rule |
 | --- | --- |
 | Identifiers | Every id Attest mints is a lowercase UUID v4 string from `crypto.randomUUID()` (no library, same in Workers and browsers). Meta identifiers (`file_id`, `request_id`, ASR `turnId`) are stored verbatim in fields named for them. Segments are numbered by integer `n` starting at 0 per session; `n` is never a UUID. |
-| Time | All times are integers in milliseconds. Suffix `_at` = Unix epoch ms, UTC, from the server clock (`Date.now()` in the Worker). Suffix `_ms` = offset from `session.started_at`. Inside a segment, `t_ms` = offset from the segment's own start. No ISO strings, no seconds, no floats. The browser never sets an `_at` field. |
+| Time | All times are integers in milliseconds. Suffix `_at` = Unix epoch ms, UTC, from the server clock (`Date.now()` in the Worker). Suffix `_ms` = offset from `session.started_at`. Inside a segment, `t_ms` = offset from the segment's own start. No ISO strings, no seconds, no floats. The browser never sets an `_at` field, with one exception: the segment PUT's `X-Segment-Ended-At`, stored as `segments.capture_ended_at`, is on the browser's clock. |
 | Confidence | A number in [0, 1]. Thresholds live in `worker/perception/config.ts`, never in a contract. |
 | Money and usage | Cost is an integer in micro-USD (`cost_micro_usd`; $1 = 1,000,000). Tokens are integers. Media usage is an integer `media_units` with `media_unit_kind` saying what the unit is. Prices come from one versioned table, `shared/pricing.ts`, carrying the as-of date it was read from [dev.meta.ai](http://dev.meta.ai) (Oct 23, 2026 values in the API facts page). |
 | Enums | Lowercase `snake_case` string literals. Adding a value is a Contract PR. |
-| Strings | UTF-8, trimmed. Spoken text (`say.text`, hazard `message`) is capped at 40 words; rationales at 40 words; summaries at 60 words. Caps are enforced by the validator, not trusted from the model. |
+| Strings | UTF-8, trimmed. Spoken text (`say.text`, hazard `message`) is capped at 40 words; rationales at 40 words; segment summaries at 25 words. Caps are enforced by the validator, not trusted from the model. |
 | Versioning | Every contract exports `version: 1`. Every WebSocket message and every persisted record carries `v: 1`. A breaking change bumps the number and updates every consumer in the same merge. |
 | Nullability | A field that may be absent is `null`, never missing and never `undefined`. Zod: `.nullable()`, not `.optional()`, on everything a consumer reads. |
 | Error shape | One shape everywhere (HTTP body and WebSocket `error` message): `{ error: { code, message, retryable, request_id } }`. `code` is from the error enum below; `message` is for humans and never contains secrets; `retryable` is a boolean the client acts on; `request_id` is Meta's id when the error came from a model call, else null. |
@@ -129,7 +131,7 @@ Segment timing no longer travels on the socket (see Changes to the spec): the PU
 
 ## Segment upload (D → A, HTTP)
 
-`PUT /api/sessions/:id/segments/:n` with body `video/mp4` (faststart, H.264, one standalone segment) and headers `X-Segment-Started-Ms` (session-relative), `X-Segment-Duration-Ms`, `X-Segment-Sha256`. Response `202 { v: 1, n, r2_key, file_id, state: "queued" }`. A repeat PUT of an accepted `n` with the same sha256 returns `200` with the same body; a different sha256 is `conflict`. R2 key: `sessions/${session_id}/segments/${n}.mp4`. The Files API upload sets `expires_after` 7 days. Idempotency key: `segment:${session_id}:${n}`.
+`PUT /api/sessions/:id/segments/:n` with body `video/mp4` (faststart, H.264, one standalone segment) and headers `X-Segment-Started-Ms` (session-relative), `X-Segment-Duration-Ms`, `X-Segment-Ended-At`, `X-Segment-Sha256`. `X-Segment-Ended-At` is epoch ms on the browser's clock when the segment's capture ended (the wall clock at the session's first frame plus `started_ms + duration_ms`); a replay sends the time its schedule uploads the segment, as a live segment is uploaded when its capture ends. The server stores it as `segments.capture_ended_at` and uses it only for `latency_ms`; the two clocks are the same machine's in local runs, and deployed, `latency_ms` includes any offset between the browser's clock and the server's. Response `202 { v: 1, n, r2_key, file_id, state: "queued" }`. A repeat PUT of an accepted `n` with the same sha256 returns `200` with the same body; a different sha256 is `conflict`. R2 key: `sessions/${session_id}/segments/${n}.mp4`. The Files API upload sets `expires_after` 7 days. Idempotency key: `segment:${session_id}:${n}`.
 
 ## ServerMessage (A → D, WebSocket down)
 
@@ -180,23 +182,23 @@ One SAM request per object label (one concept per request, per the docs). `frame
 
 ## Observation (Spark → B; validated before anything reads it)
 
-The JSON Schema sent to Spark is generated per procedure so `step_id`, `rule_id` and `object_labels` are enums of that procedure's ids and labels.
+Spark replies under a JSON Schema generated per procedure that names steps and rules by number (a step's `ordinal`; a rule's 1-based position in `hazard_rules`) and `object_labels` as an enum of the procedure's labels: `{ summary, activity, steps: [{ step, state: "in_progress" | "completed", confidence, object_labels, moment_ms, description }], rules: [{ rule, state: "satisfied" | "violated", confidence, object_labels, moment_ms, description }] }`, listing only the window's steps and rules the segment shows something about. The server maps each number to its id and validates the result as the `Observation` below, with `step_id` and `rule_id` as enums of that procedure's ids. A step or rule left out of the reply has no entry, so the server never produces `not_observed` or `cannot_tell`; the values stay in the enums.
 
 ```javascript
 Observation {
-  segment_summary: string (≤ 60 words)
+  segment_summary: string (≤ 25 words)
   worker_activity: "working" | "idle" | "hands_not_visible" | "away"
   step_observations: [{
     step_id: enum(step ids)
     state: "in_progress" | "completed" | "not_observed" | "cannot_tell"
     confidence: number [0, 1]
-    evidence: { object_labels: enum(labels)[], moment_ms: int [0, segment_ms], description: string (≤ 25 words) }
+    evidence: { object_labels: enum(labels)[], moment_ms: int [0, segment_ms], description: string (≤ 12 words) }
   }]
   hazards: [{
     rule_id: enum(rule ids)
     state: "satisfied" | "violated" | "cannot_tell"
     confidence: number [0, 1]
-    evidence: { object_labels: enum(labels)[], moment_ms: int, description: string (≤ 25 words) }
+    evidence: { object_labels: enum(labels)[], moment_ms: int, description: string (≤ 12 words) }
   }]
 }
 ```
@@ -215,7 +217,7 @@ EventBase {
   segment_n: int
   detected_at: epoch_ms
   session_ms: int
-  latency_ms: int (detected_at − the wall-clock end of segment_n; the number the measurement table reports)
+  latency_ms: int (detected_at − the end of segment_n's capture, X-Segment-Ended-At on the browser's clock; the number the measurement table reports)
   source: "observation" | "tracks" | "worker_confirm" | "rule" | "system"
   confidence: number | null
   rationale: string (≤ 40 words)

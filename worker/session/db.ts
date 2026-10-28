@@ -69,6 +69,8 @@ export interface SegmentRow {
   file_id: string;
   started_ms: number;
   duration_ms: number;
+  // When capture of the segment ended, on the browser's clock (X-Segment-Ended-At).
+  capture_ended_at: number;
   frame_w: number;
   frame_h: number;
   received_at: number;
@@ -79,9 +81,9 @@ export async function insertSegment(db: D1Database, row: SegmentRow): Promise<vo
   const key = `segment:${row.session_id}:${String(row.n)}`;
   await db
     .prepare(
-      "INSERT OR IGNORE INTO segments (session_id, n, sha256, r2_key, file_id, started_ms, duration_ms, frame_w, frame_h, received_at, state, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO segments (session_id, n, sha256, r2_key, file_id, started_ms, duration_ms, capture_ended_at, frame_w, frame_h, received_at, state, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(row.session_id, row.n, row.sha256, row.r2_key, row.file_id, row.started_ms, row.duration_ms, row.frame_w, row.frame_h, row.received_at, row.state, key)
+    .bind(row.session_id, row.n, row.sha256, row.r2_key, row.file_id, row.started_ms, row.duration_ms, row.capture_ended_at, row.frame_w, row.frame_h, row.received_at, row.state, key)
     .run();
   const stored = await db.prepare("SELECT sha256 FROM segments WHERE idempotency_key = ?").bind(key).first<{ sha256: string }>();
   if (stored?.sha256 !== row.sha256) throw new ConflictError(key);
