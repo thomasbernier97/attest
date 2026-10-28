@@ -1,6 +1,6 @@
 // One segment through SAM and Spark in parallel: one SAM request per object of the segment's window
-// and one Spark observe request on the same file_id. Spark reads the previous segment's tracks summary, so it never waits
-// on this segment's SAM calls. Every call becomes a ModelCall row, whatever its outcome; any failed
+// and one Spark observe request on the same file_id. Spark reads the tracks summary of the latest
+// earlier segment whose SAM calls had finished, so it never waits on this segment's SAM calls. Every call becomes a ModelCall row, whatever its outcome; any failed
 // call makes the segment a gap.
 import {
   MODEL_CALL_VERSION,
@@ -32,8 +32,13 @@ export interface SegmentJob {
   state_text: string;
   window: ObserveWindow;
   recent_summaries: readonly string[];
-  previous_tracks: string | null;
+  // The latest earlier segment whose SAM calls had finished when this one started, with its tracks
+  // summary; null when there is none or its SAM failed.
+  previous_tracks: { n: number; summary: string } | null;
   timeout_ms: number;
+  // Called once this segment's SAM calls have all finished, before Spark's may have; tracks is null
+  // when any of them failed.
+  on_tracks?: (tracks: Tracks | null) => void;
 }
 
 export interface SegmentGap {
@@ -177,7 +182,7 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
       procedure: job.procedure,
       state: job.state_text,
       window: job.window,
-      previous_tracks: job.previous_tracks,
+      previous_tracks: previousTracksText(job),
       recent_summaries: job.recent_summaries,
       prompt_cache_key: `procedure:${job.procedure.id}`,
       effort: SPARK_EFFORT,
@@ -186,17 +191,18 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
   );
   const samResults = await Promise.all(samRuns);
   const samLatency = Date.now() - started;
+  const samValues = samResults.flatMap((result) => (result.ok ? [result.value] : []));
+  const tracks = samValues.length === samInput.objects.length ? buildTracks(samValues, samInput, samLatency) : null;
+  job.on_tracks?.(tracks);
   const sparkResult = await sparkRun;
 
   const calls: ModelCall[] = [];
-  const samCalls: SamCall[] = [];
   const failures: Failure[] = [];
   const affected: GapEvent["affected"] = [];
   const details: string[] = [];
   samResults.forEach((result, index) => {
     const label = samInput.objects[index]?.label ?? null;
     if (result.ok) {
-      samCalls.push(result.value);
       calls.push(samRow(job, result.value));
     } else {
       const failure = classify(result.error);
@@ -218,13 +224,19 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
     affected.push("spark");
   }
 
-  const tracks = samCalls.length === samInput.objects.length ? buildTracks(samCalls, samInput, samLatency) : null;
   const first = failures[0];
   const gap = first === undefined ? null : { reason: first.reason, affected, detail: details.join("; ") };
   return { tracks, observation, calls, gap };
 }
 
-// What Spark reads about the previous segment: per object, how often SAM found it and where last.
+function previousTracksText(job: SegmentJob): string | null {
+  const previous = job.previous_tracks;
+  if (previous === null) return null;
+  const back = job.segment_n - previous.n;
+  return `segment ${String(previous.n)} (${back === 1 ? "the previous one" : `${String(back)} before this one`}): ${previous.summary}`;
+}
+
+// What Spark reads about an earlier segment: per object, how often SAM found it and where last.
 export function tracksSummary(tracks: Tracks): string {
   return tracks.objects
     .map((object) => {

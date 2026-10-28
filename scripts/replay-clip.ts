@@ -2,8 +2,10 @@
 // procedure text (or gets the procedure already stored from it), approves it, creates a replay
 // session for it, opens the session socket, uploads either one clip as segment 0 or a directory of
 // segments at the offsets they were first received at, prints every server message, then checks
-// the messages against the local D1 rows and prints, per segment, the queue wait, processing time,
-// objects tracked, Spark's cached tokens and the events, and the Meta request count and cost.
+// the messages against the local D1 rows and prints, per segment, when it arrived (was accepted),
+// started processing and was done (relative to segment 0's arrival), the queue wait, the objects
+// tracked, Spark's cached tokens and the events with their detection latency, and the Meta request
+// count and cost.
 // Usage: pnpm tsx scripts/replay-clip.ts [--base http://127.0.0.1:8787]
 //          [--clip fixtures/clips/first-clip.mp4 | --segments <dir>] [--source docs/demo-procedure.md]
 //          [--wait-ms 60000] [--persist-to <wrangler state dir>]
@@ -154,6 +156,8 @@ async function main(): Promise<void> {
     return states[0] === "queued" && states[1] === "processing" && (states[2] === "done" || states[2] === "gap");
   });
   checks.push(["every segment_ack runs queued, processing, then done or gap", ackOrder]);
+  const finishedOrder = messages.flatMap((message) => (message.type === "segment_ack" && (message.state === "done" || message.state === "gap") ? [message.n] : []));
+  checks.push(["segments are done or gap in segment order", finishedOrder.every((n, index) => n === index)]);
   const tracksMessages = messages.flatMap((message) => (message.type === "tracks" ? [message] : []));
   const tracksRows = d1<{ segment_n: number; body: string }>(`SELECT segment_n, body FROM tracks WHERE session_id = '${sessionId}' ORDER BY segment_n`);
   checks.push([`one tracks row per tracks message (${String(tracksMessages.length)} sent, ${String(tracksRows.length)} stored)`, tracksMessages.length === tracksRows.length]);
@@ -183,7 +187,9 @@ async function main(): Promise<void> {
     segmentRows.length === segments.length && segmentRows.every((row) => row.state === acks(row.n).at(-1)?.state),
   ]);
 
-  console.log(`\nper segment (replay session ${sessionId}, recorded segments):`);
+  console.log(`\nper segment (replay session ${sessionId}, recorded segments; times in ms after segment 0 arrived):`);
+  const zero = acks(0).find((ack) => ack.state === "queued")?.server_at;
+  const rel = (at: number | undefined) => (at === undefined || zero === undefined ? "?" : String(at - zero));
   for (const segment of segments) {
     const at = (state: string) => acks(segment.n).find((ack) => ack.state === state)?.server_at;
     const queued = at("queued");
@@ -194,10 +200,10 @@ async function main(): Promise<void> {
     const usage = spark === undefined ? null : (JSON.parse(spark.body) as { tokens_in: number; tokens_cached: number });
     const events = eventRows
       .filter((event) => event.segment_n === segment.n)
-      .map((event) => `${event.type}${"step_id" in event ? ` step ${String(ordinalOf.get(event.step_id))}` : ""} ${String(event.confidence)} ${event.id}`);
+      .map((event) => `${event.type}${"step_id" in event ? ` step ${String(ordinalOf.get(event.step_id))}` : ""} ${String(event.confidence)} latency ${String(event.latency_ms)} ms ${event.id}`);
     const span = (from: number | undefined, to: number | undefined) => (from === undefined || to === undefined ? "?" : String(to - from));
     console.log(
-      `  ${String(segment.n)}: queue ${span(queued, processing)} ms, processing ${span(processing, end)} ms, ${acks(segment.n).at(-1)?.state ?? "?"}; ` +
+      `  ${String(segment.n)}: arrived ${rel(queued)}, started ${rel(processing)}, done ${rel(end)}; queue ${span(queued, processing)} ms, processing ${span(processing, end)} ms, ${acks(segment.n).at(-1)?.state ?? "?"}; ` +
         `objects ${objects.join(" ") || "none"}; spark cached ${String(usage?.tokens_cached)}/${String(usage?.tokens_in)}; events ${events.join("; ") || "none"}`,
     );
   }

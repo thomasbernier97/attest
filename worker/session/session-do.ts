@@ -1,7 +1,8 @@
 // One Durable Object per session. It holds the session's working state in its own storage, accepts
-// segments strictly in order, processes them one at a time from an alarm (SAM and Spark in
-// parallel, then the state machine), persists Tracks, events and ModelCall rows to D1, and
-// broadcasts everything on the session's WebSockets in persistence order.
+// segments strictly in order, and runs them from an alarm: up to SEGMENTS_IN_FLIGHT segments have
+// their SAM and Spark calls running at once, and their results are applied to the state machine
+// strictly in segment order. It persists Tracks, events and ModelCall rows to D1 and broadcasts
+// everything on the session's WebSockets in persistence order.
 import { DurableObject } from "cloudflare:workers";
 import {
   ClientMessage,
@@ -9,6 +10,7 @@ import {
   SERVER_MESSAGE_VERSION,
   ServerMessage,
   type ErrorBody,
+  type GapEvent,
   type Procedure,
   type SegmentUploadResponse,
   TimelineEvent,
@@ -22,9 +24,10 @@ import {
   MODEL_TIMEOUT_MS,
   RECENT_SUMMARIES,
   SAY_MS_PER_WORD,
+  SEGMENTS_IN_FLIGHT,
   SPARK_WORST_CASE_TOKENS,
 } from "../perception/config";
-import { runSegment, tracksSummary, windowObjects } from "../perception/segment";
+import { runSegment, tracksSummary, windowObjects, type SegmentResult } from "../perception/segment";
 import {
   applyConfirm,
   applyObservation,
@@ -37,6 +40,7 @@ import {
   stateText,
   type EventContext,
   type MachineState,
+  type ObserveWindow,
   type Say,
 } from "../perception/state";
 import {
@@ -61,12 +65,21 @@ interface Stored {
   machine: MachineState;
   // Accepted segments; n runs 0, 1, 2, ... with no holes.
   segments: SegmentRecord[];
-  next_process_n: number;
+  // The next segment whose result is applied; every segment before it is done or a gap.
+  next_apply_n: number;
   // Segment summaries from Spark, oldest first, at most RECENT_SUMMARIES.
   summaries: string[];
-  previous_tracks: string | null;
+  // The highest-numbered segment whose SAM calls have finished, with its tracks summary; the
+  // summary is null when SAM failed on it or it was not sent to SAM.
+  latest_tracks: { n: number; summary: string | null } | null;
   last_event_id: string | null;
 }
+
+// What a started segment hands to the in-order apply step.
+type Outcome =
+  | { kind: "skipped" }
+  | { kind: "gap"; reason: GapEvent["reason"]; affected: GapEvent["affected"]; rationale: string }
+  | { kind: "observed"; window: ObserveWindow; result: SegmentResult };
 
 export interface SegmentPut {
   n: number;
@@ -97,6 +110,17 @@ export class SessionDO extends DurableObject<Env> {
   private uploading = new Set<number>();
   // Events are persisted and broadcast one at a time, in order.
   private emitting: Promise<void> = Promise.resolve();
+  // Segments whose model calls are running, with the worst-case cost each holds for the spend check
+  // until its ModelCall rows are stored.
+  private inFlight = new Map<number, number>();
+  // Outcomes of finished segments waiting for the segments before them to be applied.
+  private ready = new Map<number, Outcome>();
+  private nextStartN = 0;
+  // Accepted segments whose queued ack has not gone out yet.
+  private acking = new Set<number>();
+  private pumping: Promise<void> | null = null;
+  private wake: (() => void) | null = null;
+  private poked = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -116,9 +140,9 @@ export class SessionDO extends DurableObject<Env> {
       procedure,
       machine: initialState(procedure),
       segments: [],
-      next_process_n: 0,
+      next_apply_n: 0,
       summaries: [],
-      previous_tracks: null,
+      latest_tracks: null,
       last_event_id: null,
     };
     await this.save();
@@ -182,34 +206,107 @@ export class SessionDO extends DurableObject<Env> {
       state: "queued",
     };
     st.segments.push(record);
+    // The pump does not start it before its queued ack has gone out.
+    this.acking.add(put.n);
     const starting = st.session.started_at === null;
     if (starting) st.session = { ...st.session, state: "running", started_at: record.received_at };
     await this.save();
     await insertSegment(this.env.DB, { session_id: session.id, ...record });
     if (starting) await updateSession(this.env.DB, st.session);
     this.broadcast({ type: "segment_ack", n: put.n, state: "queued" });
+    this.acking.delete(put.n);
+    // A running alarm starts the segment now; otherwise the alarm starts one.
+    this.poke();
     await this.ctx.storage.setAlarm(Date.now());
     return { status: 202, body: response(record) };
   }
 
-  // Processes queued segments in order, one at a time.
   override async alarm(): Promise<void> {
+    await this.pump();
+  }
+
+  private pump(): Promise<void> {
     const st = this.stored;
-    if (st === null) return;
-    for (;;) {
-      const segment = st.segments.find((candidate) => candidate.n === st.next_process_n);
-      if (segment === undefined) return;
-      try {
-        await this.process(st, segment);
-      } catch (error) {
-        // A failure here is ours, not a model's; the segment is still a gap and nothing changes.
-        console.error("segment processing failed", segment.n, error);
-        st.previous_tracks = null;
-        await this.finish(st, segment, gapEvent(this.context(st, segment), "model_error", [], "The server failed while processing this segment."));
-      }
-      st.next_process_n = segment.n + 1;
-      await this.save();
+    if (st === null) return Promise.resolve();
+    this.pumping ??= this.runPump(st).finally(() => {
+      this.pumping = null;
+    });
+    return this.pumping;
+  }
+
+  private poke(): void {
+    this.poked = true;
+    this.wake?.();
+  }
+
+  // Starts segments while a slot is free and applies finished ones in segment order, until every
+  // accepted segment is applied.
+  private async runPump(st: Stored): Promise<void> {
+    if (this.inFlight.size === 0 && this.ready.size === 0) {
+      // Segments started before an eviction and not applied are started again, and tracks from
+      // them are not handed to the segments before them.
+      this.nextStartN = st.next_apply_n;
+      if (st.latest_tracks !== null && st.latest_tracks.n >= st.next_apply_n) st.latest_tracks = null;
     }
+    for (;;) {
+      for (let outcome = this.ready.get(st.next_apply_n); outcome !== undefined; outcome = this.ready.get(st.next_apply_n)) {
+        const n = st.next_apply_n;
+        const segment = st.segments[n];
+        // The outcome stays ready until it is applied, so an alarm retry after a failure applies it.
+        if (segment !== undefined) await this.apply(st, segment, outcome);
+        st.next_apply_n = n + 1;
+        this.ready.delete(n);
+        await this.save();
+      }
+      // A slot is a segment started and not yet applied, so no segment starts from a state more than
+      // SEGMENTS_IN_FLIGHT segments behind it.
+      for (
+        let segment = st.segments[this.nextStartN];
+        segment !== undefined && !this.acking.has(segment.n) && this.nextStartN - st.next_apply_n < SEGMENTS_IN_FLIGHT;
+        segment = st.segments[this.nextStartN]
+      ) {
+        this.start(st, segment);
+      }
+      if (this.inFlight.size === 0 && st.next_apply_n >= st.segments.length) return;
+      // A poke since the last wait (a segment finished or arrived) means another pass now.
+      if (!this.takePoke()) {
+        await new Promise<void>((resolve) => {
+          this.wake = resolve;
+        });
+        this.wake = null;
+      }
+    }
+  }
+
+  private takePoke(): boolean {
+    const poked = this.poked;
+    this.poked = false;
+    return poked;
+  }
+
+  private start(st: Stored, segment: SegmentRecord): void {
+    const n = segment.n;
+    this.nextStartN = n + 1;
+    this.inFlight.set(n, 0);
+    void this.run(st, segment)
+      .catch((error: unknown): Outcome => {
+        // A failure here is ours, not a model's; the segment is still a gap and nothing changes.
+        console.error("segment processing failed", n, error);
+        this.noteTracks(st, n, null);
+        return { kind: "gap", reason: "model_error", affected: [], rationale: "The server failed while processing this segment." };
+      })
+      .then((outcome) => {
+        this.ready.set(n, outcome);
+      })
+      .finally(() => {
+        this.inFlight.delete(n);
+        this.poke();
+      });
+  }
+
+  // Records a segment's finished SAM calls, so segments started after it read its tracks.
+  private noteTracks(st: Stored, n: number, summary: string | null): void {
+    if (st.latest_tracks === null || n > st.latest_tracks.n) st.latest_tracks = { n, summary };
   }
 
   private context(st: Stored, segment: SegmentRecord): EventContext {
@@ -233,34 +330,40 @@ export class SessionDO extends DurableObject<Env> {
     return sam * samCalls + spark;
   }
 
-  private async process(st: Stored, segment: SegmentRecord): Promise<void> {
+  // Runs one segment's SAM and Spark calls and stores their ModelCall rows; the state machine is
+  // not touched until apply().
+  private async run(st: Stored, segment: SegmentRecord): Promise<Outcome> {
     const { session, procedure } = st;
+    // The window, state text and summaries come from the latest applied state, and the tracks from
+    // the latest segment whose SAM calls have finished, all as they stand when the segment starts.
+    const window = observeWindow(procedure, st.machine);
+    const state_text = stateText(procedure, st.machine);
+    const recent_summaries = [...st.summaries];
+    const latest = st.latest_tracks;
+    const previous_tracks = latest?.summary == null || latest.n >= segment.n ? null : { n: latest.n, summary: latest.summary };
+
     segment.state = "processing";
     await this.save();
     await updateSegmentState(this.env.DB, session.id, segment.n, "processing");
     this.broadcast({ type: "segment_ack", n: segment.n, state: "processing" });
 
-    // The steps, rules and objects this segment asks about, from the machine as it stands now.
-    const window = observeWindow(procedure, st.machine);
     if (window.step_ids.length === 0) {
       // No step is left to observe, so the segment is not sent to SAM or Spark.
-      st.previous_tracks = null;
-      await this.finish(st, segment, null);
-      return;
+      this.noteTracks(st, segment.n, null);
+      return { kind: "skipped" };
     }
     const samCalls = windowObjects(procedure, window).length;
+    this.inFlight.set(segment.n, this.worstCaseCost(st, segment, samCalls));
     const spend = await spendSoFar(this.env.DB, session.id, Date.now());
-    const worst = this.worstCaseCost(st, segment, samCalls);
-    if (spend.session + worst > session.spend_cap_micro_usd || spend.daily + worst > DAILY_SPEND_CAP_MICRO_USD) {
-      st.previous_tracks = null;
+    // Every running segment counts at its worst case until its calls are stored, this one included.
+    const reserved = [...this.inFlight.values()].reduce((sum, cost) => sum + cost, 0);
+    if (spend.session + reserved > session.spend_cap_micro_usd || spend.daily + reserved > DAILY_SPEND_CAP_MICRO_USD) {
+      this.inFlight.set(segment.n, 0);
+      this.noteTracks(st, segment.n, null);
       const rationale = "The spend cap would be passed, so the segment was not sent to SAM or Spark.";
-      await this.finish(st, segment, gapEvent(this.context(st, segment), "spend_cap", ["sam", "spark"], rationale));
-      return;
+      return { kind: "gap", reason: "spend_cap", affected: ["sam", "spark"], rationale };
     }
 
-    const previousTracks = st.previous_tracks;
-    // From here on the previous segment is this one: its tracks, or none when SAM failed on it.
-    st.previous_tracks = null;
     const result = await runSegment(
       { apiKey: this.env.META_API_KEY, requestsLeft: samCalls + 1 },
       {
@@ -273,21 +376,46 @@ export class SessionDO extends DurableObject<Env> {
         frame_w: segment.frame_w,
         frame_h: segment.frame_h,
         procedure,
-        state_text: stateText(procedure, st.machine),
+        state_text,
         window,
-        recent_summaries: st.summaries,
-        previous_tracks: previousTracks,
+        recent_summaries,
+        previous_tracks,
         timeout_ms: MODEL_TIMEOUT_MS,
+        on_tracks: (tracks) => {
+          this.noteTracks(st, segment.n, tracks === null ? null : tracksSummary(tracks));
+        },
       },
     );
     for (const call of result.calls) await insertModelCall(this.env.DB, call);
+    // Its calls now count in spendSoFar.
+    this.inFlight.set(segment.n, 0);
+    return { kind: "observed", window, result };
+  }
 
+  // Applies one segment's outcome; called in segment order only.
+  private async apply(st: Stored, segment: SegmentRecord, outcome: Outcome): Promise<void> {
+    try {
+      if (outcome.kind === "skipped") {
+        await this.finish(st, segment, null);
+      } else if (outcome.kind === "gap") {
+        await this.finish(st, segment, gapEvent(this.context(st, segment), outcome.reason, outcome.affected, outcome.rationale));
+      } else {
+        await this.applyResult(st, segment, outcome.window, outcome.result);
+      }
+    } catch (error) {
+      // A failure here is ours, not a model's; the segment is still a gap and nothing changes.
+      console.error("segment processing failed", segment.n, error);
+      await this.finish(st, segment, gapEvent(this.context(st, segment), "model_error", [], "The server failed while processing this segment."));
+    }
+  }
+
+  private async applyResult(st: Stored, segment: SegmentRecord, window: ObserveWindow, result: SegmentResult): Promise<void> {
+    const { session, procedure } = st;
     if (result.tracks !== null) {
       const tracks = result.tracks;
       const key = `sessions/${session.id}/tracks/${String(segment.n)}.json`;
       await this.env.MEDIA.put(key, JSON.stringify(tracks), { httpMetadata: { contentType: "application/json" } });
       await insertTracks(this.env.DB, tracks, key);
-      st.previous_tracks = tracksSummary(tracks);
       this.broadcast({
         type: "tracks",
         n: segment.n,
@@ -312,8 +440,8 @@ export class SessionDO extends DurableObject<Env> {
       return;
     }
 
-    // State changes are applied to the machine as it stands now, after the awaits above, and only
-    // from the entries about the window this segment asked about.
+    // State changes are applied to the machine as it stands now, after the segments before this one,
+    // and only from the entries about the window this segment asked about.
     const windowed = restrictToWindow(result.observation, window);
     const transition = applyObservation(procedure, st.machine, windowed.observation, ctx, segment.n);
     st.machine = transition.state;
