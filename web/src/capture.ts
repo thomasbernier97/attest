@@ -45,6 +45,9 @@ export interface Segment {
   // Capture time of the segment's first frame, from the first frame of the session.
   started_ms: number;
   duration_ms: number;
+  // When capture of its last frame's interval ended: Date.now() at the session's first frame plus
+  // the capture offset, so the server can measure latency_ms from it.
+  ended_at: number;
   frames: number;
   bytes: ArrayBuffer;
 }
@@ -73,6 +76,8 @@ export class SegmentRecorder {
   private readonly segmentOf = new Map<number, number>();
   private current: OpenSegment | null = null;
   private firstUs: number | null = null;
+  // Date.now() when the first frame was taken.
+  private firstWallMs: number | null = null;
   private nextUs = 0;
   private lastEncodedN = -1;
   // Segments sent so far; the server needs n to run 0, 1, 2, ... with no holes.
@@ -124,6 +129,7 @@ export class SegmentRecorder {
   private takeFrame(frame: VideoFrame): void {
     if (this.stopped) return;
     this.firstUs ??= frame.timestamp;
+    this.firstWallMs ??= Date.now();
     const rel = frame.timestamp - this.firstUs;
     if (rel < this.nextUs) return;
     this.nextUs += FRAME_US;
@@ -178,10 +184,12 @@ export class SegmentRecorder {
     open.muxer.finalize();
     const durationMs = Math.round((open.last_us - open.first_us + FRAME_US) / 1000);
     if (durationMs < minMs) return;
+    const startedMs = Math.round((open.first_us - (this.firstUs ?? open.first_us)) / 1000);
     this.onSegment({
       n: this.sent++,
-      started_ms: Math.round((open.first_us - (this.firstUs ?? open.first_us)) / 1000),
+      started_ms: startedMs,
       duration_ms: durationMs,
+      ended_at: (this.firstWallMs ?? Date.now()) + startedMs + durationMs,
       frames: open.frames,
       bytes: open.muxer.target.buffer,
     });

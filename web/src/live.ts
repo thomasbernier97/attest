@@ -153,6 +153,7 @@ export class LiveSession {
             "Content-Type": "video/mp4",
             "X-Segment-Started-Ms": String(segment.started_ms),
             "X-Segment-Duration-Ms": String(segment.duration_ms),
+            "X-Segment-Ended-At": String(segment.ended_at),
             "X-Segment-Sha256": sha256,
           },
           body: segment.bytes,

@@ -1,0 +1,32 @@
+{
+  "segment_summary": "Worker puts second blue glove on right hand, completing gloving.",
+  "worker_activity": "working",
+  "step_observations": [
+    {
+      "step_id": "bf44d31d-1a37-4d68-a71f-9f42dbbcd0d3",
+      "state": "completed",
+      "confidence": 0.95,
+      "evidence": {
+        "object_labels": [
+          "gloves"
+        ],
+        "moment_ms": 3000,
+        "description": "Pull second glove onto right hand"
+      }
+    }
+  ],
+  "hazards": [
+    {
+      "rule_id": "bf7d6808-8e59-4dcf-9d24-4e8ee81e7d54",
+      "state": "satisfied",
+      "confidence": 0.95,
+      "evidence": {
+        "object_labels": [
+          "gloves"
+        ],
+        "moment_ms": 3000,
+        "description": "Both hands in blue gloves"
+      }
+    }
+  ]
+}

@@ -12,7 +12,7 @@ import {
 } from "@attest/shared";
 import { MetaApiError, type MetaClient } from "../meta/api";
 import { callCost, usageNumber } from "../meta/cost";
-import { SPARK_EFFORT } from "./config";
+import { SPARK_EFFORT, SPARK_MAX_OUTPUT_TOKENS } from "./config";
 import { buildTracks, SAM_MODEL, trackObject, type SamCall, type SegmentInput } from "./sam";
 import { observeSegment, SPARK_MODEL, type SparkCall } from "./spark";
 import type { ObserveWindow } from "./state";
@@ -186,6 +186,7 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
       recent_summaries: job.recent_summaries,
       prompt_cache_key: `procedure:${job.procedure.id}`,
       effort: SPARK_EFFORT,
+      max_output_tokens: SPARK_MAX_OUTPUT_TOKENS,
       timeout_ms: job.timeout_ms,
     }),
   );

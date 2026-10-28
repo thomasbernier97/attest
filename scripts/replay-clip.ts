@@ -122,7 +122,10 @@ async function main(): Promise<void> {
 
   const start = Date.now();
   for (const segment of segments) {
-    await sleep(Math.max(0, start + segment.offset_ms - Date.now()));
+    // A live segment is uploaded as its capture ends, so a replayed one's capture ends at its
+    // scheduled upload time.
+    const endedAt = start + segment.offset_ms;
+    await sleep(Math.max(0, endedAt - Date.now()));
     const bytes = readFileSync(segment.path);
     const put = await fetch(`${values.base}/api/sessions/${sessionId}/segments/${String(segment.n)}`, {
       method: "PUT",
@@ -131,6 +134,7 @@ async function main(): Promise<void> {
         "Content-Type": "video/mp4",
         "X-Segment-Started-Ms": String(segment.started_ms),
         "X-Segment-Duration-Ms": String(segment.duration_ms),
+        "X-Segment-Ended-At": String(endedAt),
         "X-Segment-Sha256": createHash("sha256").update(bytes).digest("hex"),
       },
       body: bytes,
