@@ -276,10 +276,10 @@ The video carries the case on its own; the live URL, public repo and README exis
 
 **Demo script** (one continuous live take, about 2 minutes, filmed with the deployed app)
 
-1. Procedure already approved on screen; camera on the bench; the worker says "start" and the session begins. SAM outlines appear on the gloves, fan, bracket, screwdriver, controller, power strip, tool tray and taped square. The procedure is `docs/demo-procedure.md`.
-2. Steps 1 to 3 complete at natural pace (gloves on, fan flat in the taped square, screwdriver out of the tray); each lights up with its clip thumbnail. Gloves hazard rule shown satisfied at step 2.
+1. Procedure already approved on screen; camera on the bench; the worker says "start" and the session begins. SAM outlines appear on the blue nitrile gloves, fan, bracket, screwdriver, controller, power strip, tool tray and taped square. The procedure is `docs/demo-procedure.md`.
+2. Steps 1 to 3 complete at natural pace (blue nitrile gloves on, fan flat in the taped square, screwdriver out of the tray); each lights up with its clip thumbnail. Gloves hazard rule shown satisfied at step 2.
 3. Worker asks "what's next?" mid-motion; spoken answer within a couple of seconds.
-4. Worker skips step 4 and starts step 5: the bracket stays on the mat while the fan stands up without it. Timeline marker turns red; system says "Step 4 not observed, did you install the bracket?" Worker says "go back", installs the bracket, marker clears.
+4. Worker skips step 4 and starts step 5: the bracket stays on the desk while the fan stands up without it. Timeline marker turns red; system says "Step 4 not observed, did you install the bracket?" Worker says "go back", installs the bracket, marker clears.
 5. Worker reaches to connect the fan cable while the power strip's switch is still lit. Hazard banner; step 6 blocked; worker switches the power strip off and its light goes out; banner clears; step completes.
 6. Step 7 (power strip back on, fan blades spinning) and step 8 (screwdriver back in the tool tray) complete; session closes; report appears: 8 steps, 1 skipped then completed, 1 hazard averted, p50 latency, session cost.
 
@@ -324,7 +324,7 @@ The video carries the case on its own; the live URL, public repo and README exis
 - [x] Official Rules: the Participant Guide (published Oct 26) settles team size (max 4; solo allowed), new work, the public repo, the 3-minute video, judging and the final round; applied in sections 2, 4, 8, 9, 10 and 11.
 - [ ] Entrant: Thomas as an individual or Flo Platforms, Inc. (prize payment, W-8BEN vs W-8BEN-E). Due before submission.
 - [ ] Attest domain: tryattest.dev, purchased by Oct 26. Its zone goes in Flo's Cloudflare account and DNS must resolve before ATT-14 deploys to it.
-- [ ] Demo kit confirmed: case fan, bracket, screws, screwdriver, USB fan controller, gloves; camera mount; a second device for filming. In hand by Oct 25.
+- [ ] Demo kit confirmed: case fan, bracket, screws, screwdriver, USB fan controller, blue nitrile gloves; camera mount; a second device for filming. In hand by Oct 25.
 - [ ] Paid billing on the Meta API key beyond the $150 credit: confirm the cap Thomas is willing to spend (recommended ceiling $200). A card must be on the account before the first API call; the $150 claim link is still pending (claim by Nov 4, 21:00 ET). Due Day 1.
 - [ ] Day 1 measurements to log here: SAM video endpoint request shape, Files API reuse across SAM and Spark, tokens and cost per 4 s segment, observed latency per stage, ASR socket turn latency.
   - **First real clip, Oct 26** (`scripts/first-clip.ts`; fixtures in `fixtures/clips/`, `fixtures/raw/`, `fixtures/Tracks/`, `fixtures/Observation/`). One 4 s webcam clip of the bench (C920, MJPEG 1280x720 at 30 fps, re-encoded to H.264 High, yuv420p, 12.5 fps = 50 frames, faststart, no audio, 343 KB): fan, bracket and screwdriver in view, screwdriver picked up. Uploaded once; SAM and Spark ran in parallel on the same file\_id, twice (Spark effort minimal, then low). 9 Meta requests in all. ASR turn latency is not measured yet.

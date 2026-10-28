@@ -6,6 +6,8 @@
 
 > **Amended Oct 26, 2026 for the session server loop (Thomas).** `Procedure.compile_call_id` is null for a draft compiled outside the server, such as the demo draft a replay session is created from.
 
+> **Amended Oct 26, 2026 for the observe window (Thomas).** `ProcedureDraft` and `Procedure` carry `starting_state`, what the camera sees before step 1, so the observation prompt can state that the starting arrangement completes no step.
+
 > 📏 Field-level specification of every contract in the spec's section 7, plus the conventions all seats share. Written Oct 24, 2026 as prose so the Day 1 Zod commit (ATT-15) is transcription. At kickoff this page becomes `docs/contracts.md` (ATT-12) and stops being edited here. Where this page tightens or changes the spec table, the change is listed at the end and goes through the spec's change log.
 
 ## Conventions every seat follows
@@ -38,6 +40,7 @@ ProcedureDraft {
   v: 1
   title: string (1–120)
   language: string (BCP-47, default "en")
+  starting_state: string | null (what the camera sees before step 1, from the text's setup, 1–400; null when the text gives none)
   steps: ProcedureStepDraft[] (1–30, ordinal order)
   objects: ObjectDraft[] (at least 1, no cap)
   hazard_rules: HazardRuleDraft[] (0–8)
@@ -69,7 +72,7 @@ HazardRuleDraft {
 Procedure {
   v: 1
   id: uuid
-  title, language, as draft
+  title, language, starting_state, as draft
   source: "text" | "pdf" | "photo" | "voice"
   source_hash: string (sha256 hex of the source text or file)
   compiled_at: epoch_ms

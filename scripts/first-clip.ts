@@ -21,6 +21,7 @@ const SAM_TIMEOUT_MS = 120_000;
 // The bench procedure the clip shows the start of.
 const PROCEDURE: ObservedProcedure = {
   title: "Fasten the bracket to the case fan",
+  starting_state: null,
   steps: [
     {
       id: "890fdff7-c650-440c-aec8-0a85a5cac322",
@@ -189,6 +190,8 @@ async function main(): Promise<void> {
       segment_ms: clip.duration_ms,
       procedure: PROCEDURE,
       state: "no step is completed yet",
+      // The clip is one segment, so it asks about every step and rule.
+      window: { step_ids: PROCEDURE.steps.map((step) => step.id), rule_ids: PROCEDURE.hazard_rules.map((rule) => rule.id) },
       previous_tracks: null,
       recent_summaries: [],
       prompt_cache_key: null,

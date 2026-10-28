@@ -1,5 +1,5 @@
-// One segment through SAM and Spark in parallel: one SAM request per object and one Spark observe
-// request on the same file_id. Spark reads the previous segment's tracks summary, so it never waits
+// One segment through SAM and Spark in parallel: one SAM request per object of the segment's window
+// and one Spark observe request on the same file_id. Spark reads the previous segment's tracks summary, so it never waits
 // on this segment's SAM calls. Every call becomes a ModelCall row, whatever its outcome; any failed
 // call makes the segment a gap.
 import {
@@ -15,6 +15,7 @@ import { callCost, usageNumber } from "../meta/cost";
 import { SPARK_EFFORT } from "./config";
 import { buildTracks, SAM_MODEL, trackObject, type SamCall, type SegmentInput } from "./sam";
 import { observeSegment, SPARK_MODEL, type SparkCall } from "./spark";
+import type { ObserveWindow } from "./state";
 
 export interface SegmentJob {
   session_id: string;
@@ -22,10 +23,14 @@ export interface SegmentJob {
   file_id: string;
   fps: number;
   segment_ms: number;
+  // The session's nominal segment length. Spark's prompt and schema use it rather than the measured
+  // length, which varies by tens of ms, so they stay the same across segments and the cache hits.
+  nominal_segment_ms: number;
   frame_w: number;
   frame_h: number;
   procedure: Procedure;
   state_text: string;
+  window: ObserveWindow;
   recent_summaries: readonly string[];
   previous_tracks: string | null;
   timeout_ms: number;
@@ -144,6 +149,11 @@ async function settle<T>(run: () => Promise<T>): Promise<Settled<T>> {
   }
 }
 
+// The procedure's objects that the window's steps and rules name, in procedure order.
+export function windowObjects(procedure: Pick<Procedure, "objects">, window: ObserveWindow): Procedure["objects"] {
+  return procedure.objects.filter((object) => window.object_labels.includes(object.label));
+}
+
 export async function runSegment(client: MetaClient, job: SegmentJob): Promise<SegmentResult> {
   const samInput: SegmentInput = {
     session_id: job.session_id,
@@ -153,7 +163,7 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
     frame_count: Math.round((job.segment_ms * job.fps) / 1000),
     frame_w: job.frame_w,
     frame_h: job.frame_h,
-    objects: job.procedure.objects.map(({ label, prompt }) => ({ label, prompt })),
+    objects: windowObjects(job.procedure, job.window).map(({ label, prompt }) => ({ label, prompt })),
     timeout_ms: job.timeout_ms,
   };
   const started = Date.now();
@@ -163,9 +173,10 @@ export async function runSegment(client: MetaClient, job: SegmentJob): Promise<S
   const sparkRun = settle(() =>
     observeSegment(client, {
       file_id: job.file_id,
-      segment_ms: job.segment_ms,
+      segment_ms: job.nominal_segment_ms,
       procedure: job.procedure,
       state: job.state_text,
+      window: job.window,
       previous_tracks: job.previous_tracks,
       recent_summaries: job.recent_summaries,
       prompt_cache_key: `procedure:${job.procedure.id}`,

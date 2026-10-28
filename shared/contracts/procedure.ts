@@ -77,6 +77,8 @@ export const ProcedureDraft = z
     v: z.literal(PROCEDURE_DRAFT_VERSION),
     title: text(1, 120),
     language: LanguageTag,
+    // What the camera sees before step 1, from the text's setup; null when the text gives none.
+    starting_state: text(1, 400).nullable(),
     steps: z.array(ProcedureStepDraft).min(1).max(30),
     objects: z.array(ObjectDraft).min(1),
     hazard_rules: z.array(HazardRuleDraft).max(8),
@@ -128,6 +130,7 @@ export const Procedure = z
     compiled_at: EpochMs,
     approved_at: EpochMs.nullable(),
     approved_by: z.string().nullable(),
+    starting_state: text(1, 400).nullable(),
     steps: z.array(ProcedureStep).min(1).max(30),
     objects: z.array(ProcedureObject).min(1),
     hazard_rules: z.array(HazardRule).max(8),
